@@ -1,0 +1,10 @@
+# AI-TP Project Rules
+
+1. Follow current backend layering: routes -> services -> models/schemas.
+2. Keep run/test kind compatibility (`unit/functional/api/perf_*/sec_*/ui`) unless explicitly migrating.
+3. Preserve resilient execution semantics: unavailable tools should be `skipped` with reason, not hard-crash the run.
+4. Keep status transitions explicit and persisted (`pending/running/completed/failed`).
+5. Report generation must include both summary and execution detail (stdout/stderr).
+6. Keep backend API-only; avoid reintroducing server-side template rendering.
+7. Prefer focused incremental edits; avoid cross-module refactors without clear need.
+8. Validate by smoke test after meaningful backend changes.

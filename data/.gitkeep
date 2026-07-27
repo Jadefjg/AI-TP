@@ -1,0 +1,2 @@
+# Runtime data directory (SQLite DB, k6 outputs, mail outbox, etc.).
+# Contents are gitignored; this placeholder keeps the folder in the repo.

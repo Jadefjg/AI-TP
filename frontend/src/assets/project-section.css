@@ -1,0 +1,54 @@
+.payload-pre {
+  margin: 0;
+  max-height: 200px;
+  overflow: auto;
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: #e2e8f0;
+  font-family: "JetBrains Mono", ui-monospace, Menlo, Monaco, Consolas, monospace;
+  background:
+    radial-gradient(ellipse at top left, rgba(14, 165, 233, 0.22), transparent 42%),
+    #0b1220;
+  border: 1px solid rgba(56, 189, 248, 0.18);
+}
+.import-label {
+  position: relative;
+  display: inline-block;
+  cursor: pointer;
+}
+.hidden-file {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+}
+.monitor-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 130px;
+  margin-top: 12px;
+  padding: 8px;
+  border-radius: 12px;
+  background:
+    linear-gradient(180deg, rgba(240, 249, 255, 0.95), rgba(241, 245, 249, 0.9)),
+    repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 11px,
+      rgba(14, 165, 233, 0.05) 11px,
+      rgba(14, 165, 233, 0.05) 12px
+    );
+  border: 1px solid rgba(14, 165, 233, 0.18);
+}
+.monitor-bar {
+  flex: 1;
+  min-width: 8px;
+  background: linear-gradient(180deg, #22d3ee, #0284c7);
+  border-radius: 2px 2px 0 0;
+  box-shadow: 0 0 8px rgba(14, 165, 233, 0.35);
+}

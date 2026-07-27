@@ -1,0 +1,77 @@
+# --- OS / IDE ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Cursor local state (keep committed rules via negation below if needed)
+.cursor/*
+!.cursor/rules/
+!.cursor/rules/**
+
+# --- Secrets & local config (NEVER commit) ---
+.env
+.env.*
+!.env.example
+!**/.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+credentials*.json
+secrets/
+.secrets/
+
+# --- Python ---
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+dist/
+build/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+*.log
+
+# --- Frontend ---
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/*.local
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
+
+# --- Runtime data (SQLite, reports, k6 artifacts, mail outbox) ---
+data/**
+!data/.gitkeep
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# --- Uploads / temp / local tooling ---
+tmp/
+temp/
+.upload/
+uploads/
+*.tmp
+coverage/
+playwright-report/
+test-results/
+
+# --- Optional local overrides ---
+*.local
+docker-compose.override.yml

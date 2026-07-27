@@ -1,0 +1,18 @@
+---
+description: AI testing platform backend conventions
+alwaysApply: true
+---
+
+# AI-TP Global Conventions
+
+- Keep current layering: `backend/api/routes` (HTTP), `backend/services` (business logic), `backend/models` + `backend/schemas` (data contracts).
+- Prefer extending existing modules over adding parallel abstractions for the same concern.
+- Preserve API route style: validate entity existence first, return `HTTPException` with clear `detail`.
+- For test execution changes, keep kind set compatible with current values:
+  `unit`, `functional`, `api`, `perf_backend`, `perf_frontend`, `sec_backend`, `sec_frontend`, `ui`.
+- Do not remove `skipped` behavior when tooling is missing; report reason via `detail`.
+- Keep run lifecycle consistent: `pending -> running -> completed/failed`, and item status updates persisted per step.
+- Reports must remain deterministic and readable: include summary table + stdout/stderr details.
+- Keep backend as API-only service. For the root endpoint, return health/info JSON instead of server-side HTML rendering.
+- Prefer minimal, additive changes; avoid broad refactors unless explicitly requested.
+- After substantive edits, run at least one smoke check (`/docs` or backend import).

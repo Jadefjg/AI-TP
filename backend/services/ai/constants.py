@@ -1,0 +1,38 @@
+from __future__ import annotations
+
+MODULE_REQUIREMENT_REVIEW = "requirement_review"
+MODULE_FUNCTIONAL_CASES = "functional_cases"
+MODULE_OPENAPI_SPEC = "openapi_spec"
+MODULE_API_AUTOMATION = "api_automation"
+MODULE_PERF_PLAN = "perf_plan"
+MODULE_SECURITY_SCAN = "security_scan"
+
+AI_MODULES: tuple[str, ...] = (
+    MODULE_REQUIREMENT_REVIEW,
+    MODULE_FUNCTIONAL_CASES,
+    MODULE_OPENAPI_SPEC,
+    MODULE_API_AUTOMATION,
+    MODULE_PERF_PLAN,
+    MODULE_SECURITY_SCAN,
+)
+
+MODEL_PROFILE_HIGH = "high_precision"
+MODEL_PROFILE_BULK = "bulk_local"
+
+MODULE_MODEL_PROFILE: dict[str, str] = {
+    MODULE_REQUIREMENT_REVIEW: MODEL_PROFILE_HIGH,
+    MODULE_FUNCTIONAL_CASES: MODEL_PROFILE_BULK,
+    MODULE_OPENAPI_SPEC: MODEL_PROFILE_BULK,
+    MODULE_API_AUTOMATION: MODEL_PROFILE_BULK,
+    MODULE_PERF_PLAN: MODEL_PROFILE_HIGH,
+    MODULE_SECURITY_SCAN: MODEL_PROFILE_BULK,
+}
+
+MODULE_REQUIRED_PLACEHOLDERS: dict[str, tuple[str, ...]] = {
+    MODULE_REQUIREMENT_REVIEW: ("user_input_requirement",),
+    MODULE_FUNCTIONAL_CASES: ("req_content",),
+    MODULE_OPENAPI_SPEC: ("project_context", "code_signals"),
+    MODULE_API_AUTOMATION: ("case_info", "api_info"),
+    MODULE_PERF_PLAN: ("biz_desc",),
+    MODULE_SECURITY_SCAN: ("api_params",),
+}
