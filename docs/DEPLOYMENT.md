@@ -16,12 +16,14 @@
 | 密钥 | `.env`（LLM、SMTP、OIDC、Stripe、飞书等） | **严禁进镜像/仓库**；用环境变量或密钥托管 |
 | 前端代理 | 开发态 Vite `/api` → 后端 | 生产由 Nginx 反代，或把 `VITE_API_BASE_URL` 指到公网 API |
 | CI | GitHub Actions：pytest + `npm run build` | 可直接接到「构建 → 发版」流水线 |
-| 容器化 | **仓库暂无 Dockerfile / Compose** | 建议作为生产标准补齐（见下文路线） |
+| 容器化 | 见 [DEPLOYMENT.DOCKER.md](./DEPLOYMENT.DOCKER.md) 与根目录 `docker-compose.yml` | **推荐默认：Compose 一键部署** |
 
 **结论：**  
 - 短平快演示：单机 + SQLite + API 内嵌 Worker。  
-- **推荐生产默认：** 单机/小集群 + **Nginx + API + 独立 Worker + MySQL + Redis**，前端静态托管。  
+- **推荐生产默认：** Docker Compose（Nginx + API + Worker + MySQL + Redis）。  
 - 高并发/多租户：再拆多副本 API、RQ/Celery Worker、对象存储与独立 k6 节点。
+
+完整容器步骤 → **[DEPLOYMENT.DOCKER.md](./DEPLOYMENT.DOCKER.md)**。
 
 ---
 

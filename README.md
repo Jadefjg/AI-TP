@@ -14,7 +14,9 @@
 5. RAG 知识库入库与 Agent 化用例生成（根据项目知识增强上下文）
 
 架构说明见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。  
-**生产部署**见 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)（推荐 Nginx + API/Worker 分离 + MySQL + Redis）。
+**生产部署**见 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)。  
+**容器化（推荐）**见 [docs/DEPLOYMENT.DOCKER.md](docs/DEPLOYMENT.DOCKER.md)（`docker compose up`）。  
+**推送到 Docker Hub / 异地运行**见 [docs/DOCKER_HUB.md](docs/DOCKER_HUB.md)。
 
 **当前版本 v0.8**：接口自动化 DSL 闭环、性能 k6 结构化监控、安全扫描与 Run 整合（bandit/npm audit + nuclei/zap）、任务中心。
 

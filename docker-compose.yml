@@ -1,0 +1,120 @@
+# AI-TP container stack (recommended production-like default)
+# Usage:
+#   cp deploy/.env.docker.example deploy/.env.docker
+#   # edit secrets (and optionally AI_TP_API_IMAGE / AI_TP_WEB_IMAGE for Hub)
+#   docker compose --env-file deploy/.env.docker up -d --build
+# Push custom images (after docker login):
+#   ./deploy/scripts/push-images.sh YOURUSER
+
+name: ai-tp
+
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpass}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-ai_tp}
+      MYSQL_USER: ${MYSQL_USER:-ai_tp}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-ai_tp_pass}
+    volumes:
+      - ai_tp_mysql:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p${MYSQL_ROOT_PASSWORD:-rootpass}"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    ports:
+      - "${MYSQL_PUBLISH_PORT:-3307}:3306"
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - ai_tp_redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    ports:
+      - "${REDIS_PUBLISH_PORT:-6379}:6379"
+
+  api:
+    image: ${AI_TP_API_IMAGE:-ai-tp-api:local}
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - deploy/.env.docker
+    environment:
+      DATABASE_URL: mysql+pymysql://${MYSQL_USER:-ai_tp}:${MYSQL_PASSWORD:-ai_tp_pass}@mysql:3306/${MYSQL_DATABASE:-ai_tp}?charset=utf8mb4
+      REDIS_URL: redis://redis:6379/0
+      JOB_QUEUE_BACKEND: ${JOB_QUEUE_BACKEND:-rq}
+      JOB_WORKER_IN_API: "false"
+      JOB_WORKER_ENABLED: "true"
+      SCHEMA_BOOTSTRAP_MODE: alembic
+      RUN_MIGRATIONS: "true"
+      BACKEND_CORS_ORIGINS: ${BACKEND_CORS_ORIGINS:-http://localhost:8080,http://127.0.0.1:8080}
+    volumes:
+      - ai_tp_data:/app/data
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8002/"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+    expose:
+      - "8002"
+
+  worker:
+    image: ${AI_TP_API_IMAGE:-ai-tp-api:local}
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile
+    restart: unless-stopped
+    command: ["/entrypoint-worker.sh"]
+    env_file:
+      - deploy/.env.docker
+    environment:
+      DATABASE_URL: mysql+pymysql://${MYSQL_USER:-ai_tp}:${MYSQL_PASSWORD:-ai_tp_pass}@mysql:3306/${MYSQL_DATABASE:-ai_tp}?charset=utf8mb4
+      REDIS_URL: redis://redis:6379/0
+      JOB_QUEUE_BACKEND: ${JOB_QUEUE_BACKEND:-rq}
+      JOB_WORKER_IN_API: "false"
+      JOB_WORKER_ENABLED: "true"
+      SCHEMA_BOOTSTRAP_MODE: alembic
+    volumes:
+      - ai_tp_data:/app/data
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+
+  web:
+    image: ${AI_TP_WEB_IMAGE:-ai-tp-web:local}
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.web
+      args:
+        VITE_API_BASE_URL: /api
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "${WEB_PUBLISH_PORT:-8080}:80"
+
+volumes:
+  ai_tp_mysql:
+  ai_tp_redis:
+  ai_tp_data:
