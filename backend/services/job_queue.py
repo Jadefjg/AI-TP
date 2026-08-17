@@ -451,6 +451,14 @@ def process_next_pending_job(worker_id: str | None = None) -> bool:
         job: ExecutionJob | None = None
         backend = (settings.job_queue_backend or "db").strip().lower()
         if backend == "redis" and settings.redis_url:
+            from backend.services.job_queue_redis import pop_ai_job, pop_job
+
+            ai_job_id = pop_ai_job(timeout_sec=0)
+            if ai_job_id:
+                from backend.services.ai_job_queue import process_ai_job as _process_ai
+
+                _process_ai(db, ai_job_id, auto_claim=True)
+                return True
             job_id = pop_job(timeout_sec=1)
             if job_id:
                 job = _claim_job(db, job_id, wid)
@@ -458,10 +466,13 @@ def process_next_pending_job(worker_id: str | None = None) -> bool:
             return False
         if not job:
             job = claim_next_pending_job(db, wid)
-        if not job:
-            return False
-        process_job(db, job.id)
-        return True
+        if job:
+            process_job(db, job.id)
+            return True
+        # Alternate: drain pending AI jobs on db backend.
+        from backend.services.ai_job_queue import process_next_pending_ai_job
+
+        return process_next_pending_ai_job(wid)
     finally:
         db.close()
 

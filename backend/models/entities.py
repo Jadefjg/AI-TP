@@ -119,6 +119,8 @@ class Project(Base):
     code_root: Mapped[str] = mapped_column(String(1024), nullable=False)
     repo_source: Mapped[str] = mapped_column(String(32), nullable=False, default="local")
     repo_branch: Mapped[str | None] = mapped_column(String(255), default=None)
+    # Default SUT / API base URL for AI execute, perf, security (optional).
+    base_url: Mapped[str | None] = mapped_column(String(1024), default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     organization: Mapped[Organization] = relationship(back_populates="projects")
@@ -132,6 +134,7 @@ class Project(Base):
     knowledge_chunks: Mapped[list[KnowledgeChunk]] = relationship(back_populates="project")
     workbench_sessions: Mapped[list[AiWorkbenchSession]] = relationship(back_populates="project")
     ci_webhook: Mapped[CiWebhookConfig | None] = relationship(back_populates="project", uselist=False)
+    ai_async_jobs: Mapped[list[AiAsyncJob]] = relationship(back_populates="project")
 
 
 class Recipient(Base):
@@ -257,6 +260,29 @@ class ExecutionJob(Base):
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
 
     run: Mapped[TestRun] = relationship(back_populates="execution_job")
+
+
+class AiAsyncJob(Base):
+    """Async AI generation jobs (avoid HTTP timeouts on LLM / agent workflows)."""
+
+    __tablename__ = "ai_async_jobs"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), nullable=False, index=True)
+    organization_id: Mapped[int | None] = mapped_column(ForeignKey("organizations.id"), nullable=True, index=True)
+    module_type: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default=JobStatus.pending.value)
+    request_payload: Mapped[dict | None] = mapped_column(JSON, default=None)
+    result_payload: Mapped[dict | None] = mapped_column(JSON, default=None)
+    attempt_count: Mapped[int] = mapped_column(default=0)
+    max_attempts: Mapped[int] = mapped_column(default=2)
+    cancel_requested: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    last_error: Mapped[str | None] = mapped_column(Text, default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+
+    project: Mapped[Project] = relationship(back_populates="ai_async_jobs")
 
 
 class TestRunItem(Base):

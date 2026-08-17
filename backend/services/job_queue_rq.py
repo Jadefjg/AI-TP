@@ -40,6 +40,23 @@ def enqueue_rq_job(job_id: int) -> str | None:
     return job.id
 
 
+def enqueue_rq_ai_job(job_id: int) -> str | None:
+    settings = get_settings()
+    queue = get_rq_queue()
+    # AI LLM calls can exceed default run timeouts; allow up to 2x run timeout.
+    timeout = max(int(settings.rq_job_timeout_sec or 600), 1200)
+    job = queue.enqueue(
+        "backend.services.job_tasks.process_ai_async_job",
+        job_id,
+        job_timeout=timeout,
+        failure_ttl=settings.rq_failure_ttl_sec,
+        result_ttl=settings.rq_result_ttl_sec,
+        description=f"ai_async_job:{job_id}",
+    )
+    logger.info("rq enqueued ai_job_id=%s rq_job=%s", job_id, job.id)
+    return job.id
+
+
 def run_rq_worker(*, burst: bool = False) -> None:
     from rq import Worker
 

@@ -81,6 +81,9 @@ class PrometheusMiddleware(BaseHTTPMiddleware):
         try:
             response = await call_next(request)
             status_code = response.status_code
+            route = request.scope.get("route")
+            if route is not None and getattr(route, "path", None):
+                path_template = str(route.path)
             return response
         finally:
             elapsed = perf_counter() - start

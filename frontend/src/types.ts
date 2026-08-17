@@ -59,6 +59,7 @@ export type Project = {
   code_root: string;
   repo_source: string;
   repo_branch: string | null;
+  base_url?: string | null;
   created_at: string;
 };
 

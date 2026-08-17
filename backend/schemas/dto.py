@@ -12,6 +12,7 @@ class ProjectCreate(BaseModel):
     code_root: str = Field(min_length=1, max_length=1024)
     repo_source: str = Field(default="local", min_length=1, max_length=32)
     repo_branch: str | None = Field(default=None, max_length=255)
+    base_url: str | None = Field(default=None, max_length=1024)
 
 
 class ProjectUpdate(BaseModel):
@@ -20,6 +21,7 @@ class ProjectUpdate(BaseModel):
     code_root: str = Field(min_length=1, max_length=1024)
     repo_source: str = Field(default="local", min_length=1, max_length=32)
     repo_branch: str | None = Field(default=None, max_length=255)
+    base_url: str | None = Field(default=None, max_length=1024)
 
 
 class ProjectOut(BaseModel):
@@ -30,6 +32,7 @@ class ProjectOut(BaseModel):
     code_root: str
     repo_source: str
     repo_branch: str | None
+    base_url: str | None = None
     created_at: datetime
     model_config = {"from_attributes": True}
 
@@ -296,6 +299,8 @@ class RunTaskOut(BaseModel):
     completed_at: datetime | None
     kinds: list[str] = Field(default_factory=list)
     failed_item_count: int = 0
+    skipped_item_count: int = 0
+    item_count: int = 0
     model_config = {"from_attributes": True}
 
 
@@ -754,6 +759,43 @@ class AiTaskOut(BaseModel):
     persisted_ids: list[int] = Field(default_factory=list)
     contexts: list[dict] | None = None
     used_fallback: bool = False
+
+
+class AiAsyncJobEnqueueIn(BaseModel):
+    module_type: str = Field(min_length=1, max_length=64)
+    # Module-specific fields (same shapes as sync AI routes).
+    requirement_text: str | None = None
+    openapi_content: str | None = None
+    case_info: str | None = None
+    api_info: str | None = None
+    case_id: int | None = None
+    biz_desc: str | None = None
+    api_doc: str | None = None
+    api_params: str | None = None
+    source_filename: str | None = None
+    source_format: str | None = None
+    notes: str | None = None
+    force_ai: bool = False
+    mode: str | None = None
+    openapi_url: str | None = None
+
+
+class AiAsyncJobOut(BaseModel):
+    id: int
+    project_id: int
+    organization_id: int | None
+    module_type: str
+    status: str
+    request_payload: dict | None = None
+    result_payload: dict | None = None
+    attempt_count: int = 0
+    max_attempts: int = 2
+    cancel_requested: bool = False
+    last_error: str | None = None
+    created_at: datetime
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    model_config = {"from_attributes": True}
 
 
 class AiArtifactOut(BaseModel):

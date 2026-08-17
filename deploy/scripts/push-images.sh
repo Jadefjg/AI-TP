@@ -29,7 +29,16 @@ if [[ -z "${AI_TP_API_IMAGE:-}" || -z "${AI_TP_WEB_IMAGE:-}" ]]; then
   AI_TP_WEB_IMAGE="${USER_NS}/ai-tp-web:${TAG}"
 fi
 
-export AI_TP_API_IMAGE AI_TP_WEB_IMAGE
+if [[ -z "${AI_TP_WORKER_IMAGE:-}" ]]; then
+  if [[ -n "$USER_NS" ]]; then
+    AI_TP_WORKER_IMAGE="${USER_NS}/ai-tp-worker:${TAG}"
+  else
+    AI_TP_WORKER_IMAGE="${AI_TP_API_IMAGE}"
+  fi
+fi
+
+export AI_TP_API_IMAGE AI_TP_WORKER_IMAGE AI_TP_WEB_IMAGE
+export AI_TP_WORKER_TARGET="${AI_TP_WORKER_TARGET:-worker-tools}"
 
 ENV_FILE="${ENV_FILE:-deploy/.env.docker}"
 COMPOSE=(docker compose)
@@ -37,12 +46,18 @@ if [[ -f "$ENV_FILE" ]]; then
   COMPOSE+=(--env-file "$ENV_FILE")
 fi
 
-echo "==> Building api/worker image: ${AI_TP_API_IMAGE}"
+echo "==> Building api image: ${AI_TP_API_IMAGE} (target=runtime)"
+echo "==> Building worker-tools image: ${AI_TP_WORKER_IMAGE} (target=${AI_TP_WORKER_TARGET})"
 echo "==> Building web image: ${AI_TP_WEB_IMAGE}"
 "${COMPOSE[@]}" build api worker web
 
 echo "==> Pushing ${AI_TP_API_IMAGE}"
 docker push "${AI_TP_API_IMAGE}"
+
+if [[ "${AI_TP_WORKER_IMAGE}" != "${AI_TP_API_IMAGE}" ]]; then
+  echo "==> Pushing ${AI_TP_WORKER_IMAGE}"
+  docker push "${AI_TP_WORKER_IMAGE}"
+fi
 
 echo "==> Pushing ${AI_TP_WEB_IMAGE}"
 docker push "${AI_TP_WEB_IMAGE}"

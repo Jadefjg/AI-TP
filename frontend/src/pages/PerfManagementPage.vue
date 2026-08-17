@@ -14,6 +14,7 @@ import {
   rememberPipelineProjectId,
 } from "../constants/aiPipeline";
 import { listTablePagination } from "../constants/listPagination";
+import { resolveProjectBaseUrl } from "../constants/projectDefaults";
 import { usePlatformStore } from "../state/platform";
 import type { AiArtifact, Project } from "../types";
 import { aiSuccessMessage } from "../utils/aiResult";
@@ -126,10 +127,7 @@ const formatDateTime = (value: string | null | undefined) => {
 
 const syncBaseUrlFromProject = (project: Project | null) => {
   if (!project) return;
-  const root = (project.code_root || "").trim();
-  if (project.repo_source === "deployed" && /^https?:\/\//i.test(root)) {
-    baseUrl.value = root.replace(/\/+$/, "");
-  }
+  baseUrl.value = resolveProjectBaseUrl(project);
 };
 
 const ensureProject = () => {

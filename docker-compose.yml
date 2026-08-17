@@ -46,6 +46,7 @@ services:
     build:
       context: .
       dockerfile: deploy/Dockerfile
+      target: runtime
     restart: unless-stopped
     env_file:
       - deploy/.env.docker
@@ -75,10 +76,13 @@ services:
       - "8002"
 
   worker:
-    image: ${AI_TP_API_IMAGE:-ai-tp-api:local}
+    # Tools image (k6 / Playwright / nuclei). Slim fallback: set
+    # AI_TP_WORKER_IMAGE=$AI_TP_API_IMAGE and AI_TP_WORKER_TARGET=runtime
+    image: ${AI_TP_WORKER_IMAGE:-ai-tp-worker:local}
     build:
       context: .
       dockerfile: deploy/Dockerfile
+      target: ${AI_TP_WORKER_TARGET:-worker-tools}
     restart: unless-stopped
     command: ["/entrypoint-worker.sh"]
     env_file:
@@ -90,6 +94,7 @@ services:
       JOB_WORKER_IN_API: "false"
       JOB_WORKER_ENABLED: "true"
       SCHEMA_BOOTSTRAP_MODE: alembic
+      PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
     volumes:
       - ai_tp_data:/app/data
     depends_on:

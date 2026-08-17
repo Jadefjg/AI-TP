@@ -23,6 +23,7 @@ celery_app.conf.update(
     task_default_queue=settings.celery_queue_name,
     task_routes={
         "backend.celery_app.process_execution_job_task": {"queue": settings.celery_queue_name},
+        "backend.celery_app.process_ai_async_job_task": {"queue": settings.celery_queue_name},
     },
 )
 
@@ -32,3 +33,10 @@ def process_execution_job_task(self, job_id: int) -> str:
     from backend.services.job_tasks import process_execution_job
 
     return process_execution_job(job_id)
+
+
+@celery_app.task(name="backend.celery_app.process_ai_async_job_task", bind=True, max_retries=0)
+def process_ai_async_job_task(self, job_id: int) -> str:
+    from backend.services.job_tasks import process_ai_async_job
+
+    return process_ai_async_job(job_id)

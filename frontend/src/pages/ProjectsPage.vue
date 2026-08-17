@@ -25,6 +25,7 @@ const projectForm = reactive({
   code_root: "",
   repo_source: "local" as "local" | "remote" | "deployed",
   repo_branch: "main",
+  base_url: "",
 });
 
 const canWrite = computed(() => store.hasPermission("project.write"));
@@ -162,6 +163,7 @@ const resetProjectForm = () => {
   projectForm.code_root = "";
   projectForm.repo_source = "local";
   projectForm.repo_branch = "main";
+  projectForm.base_url = "";
   editingId.value = null;
 };
 
@@ -178,6 +180,7 @@ const openEditModal = (item: Project) => {
   projectForm.repo_source =
     item.repo_source === "remote" || item.repo_source === "deployed" ? item.repo_source : "local";
   projectForm.repo_branch = item.repo_branch || "main";
+  projectForm.base_url = item.base_url || "";
   createOpen.value = true;
 };
 
@@ -230,6 +233,7 @@ const validateProjectForm = () => {
     code_root: codeRoot,
     repo_source: source,
     repo_branch: source === "deployed" ? null : branch,
+    base_url: projectForm.base_url.trim() || null,
   };
 };
 
@@ -420,6 +424,16 @@ onMounted(() => {
             @blur="onLocationBlur"
           />
           <div class="create-form__hint">{{ locationHint }}</div>
+        </a-form-item>
+        <a-form-item label="默认被测 Base URL（可选）">
+          <a-input
+            v-model="projectForm.base_url"
+            placeholder="例如：http://127.0.0.1:8002 或 https://api.example.com"
+            allow-clear
+          />
+          <div class="create-form__hint">
+            用于接口 / 性能 / 安全执行的默认目标地址；留空时已部署项目会回退到「部署访问地址」
+          </div>
         </a-form-item>
         <a-form-item label="项目描述（可选）">
           <a-textarea

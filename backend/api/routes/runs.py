@@ -128,17 +128,60 @@ def list_recent_runs(
             return []
         q = q.filter(TestRun.project_id.in_(allowed))
     if status:
-        q = q.filter(TestRun.status == status.strip())
+        wanted = status.strip()
+        if wanted == "skipped":
+            # Run-level status stays "completed" when every item was skipped.
+            runs_all = q.order_by(TestRun.id.desc()).limit(limit * 5).all()
+            runs = [
+                r
+                for r in runs_all
+                if (r.items or [])
+                and all(i.status == "skipped" for i in (r.items or []))
+                and not any(i.status in {"failed", "error"} for i in (r.items or []))
+            ][:limit]
+            out: list[RunTaskOut] = []
+            for run in runs:
+                items = run.items or []
+                out.append(
+                    RunTaskOut(
+                        id=run.id,
+                        project_id=run.project_id,
+                        project_name=run.project.name if run.project else None,
+                        status=run.status,
+                        created_at=run.created_at,
+                        completed_at=run.completed_at,
+                        kinds=[i.kind for i in items],
+                        failed_item_count=0,
+                        skipped_item_count=len(items),
+                        item_count=len(items),
+                    )
+                )
+            return out
+        q = q.filter(TestRun.status == wanted)
     runs = q.order_by(TestRun.id.desc()).limit(limit * 3 if failed_first else limit).all()
     if failed_first:
         priority = {"failed": 0, "running": 1, "pending": 2, "cancelled": 3, "completed": 4}
-        runs.sort(key=lambda r: (priority.get(r.status, 9), -r.id))
+
+        def _rank(r: TestRun) -> tuple[int, int]:
+            items = r.items or []
+            all_skip = (
+                bool(items)
+                and all(i.status == "skipped" for i in items)
+                and not any(i.status in {"failed", "error"} for i in items)
+            )
+            if all_skip:
+                return (3, -r.id)  # after cancelled-ish, before plain completed
+            return (priority.get(r.status, 9), -r.id)
+
+        runs.sort(key=_rank)
         runs = runs[:limit]
     else:
         runs = runs[:limit]
     out: list[RunTaskOut] = []
     for run in runs:
         items = run.items or []
+        failed_n = sum(1 for i in items if i.status in {"failed", "error"})
+        skipped_n = sum(1 for i in items if i.status == "skipped")
         out.append(
             RunTaskOut(
                 id=run.id,
@@ -148,7 +191,9 @@ def list_recent_runs(
                 created_at=run.created_at,
                 completed_at=run.completed_at,
                 kinds=[i.kind for i in items],
-                failed_item_count=sum(1 for i in items if i.status in {"failed", "error"}),
+                failed_item_count=failed_n,
+                skipped_item_count=skipped_n,
+                item_count=len(items),
             )
         )
     return out

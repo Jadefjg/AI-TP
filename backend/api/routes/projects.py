@@ -18,6 +18,7 @@ from backend.schemas.dto import (
 )
 from backend.services.audit_service import log_action
 from backend.services.credential_service import credential_status, require_project_credential_access, upsert_project_credential
+from backend.services.project_base_url import normalize_base_url
 from backend.services.project_service import delete_project
 from backend.services.repo_workspace import is_deployed_url, is_remote_repo
 from backend.services.tenant_service import (
@@ -98,6 +99,7 @@ def create_project(
         code_root=code_root,
         repo_source=inferred_source,
         repo_branch=branch,
+        base_url=normalize_base_url(body.base_url),
     )
     db.add(row)
     db.commit()
@@ -143,6 +145,7 @@ def update_project(
     project.code_root = code_root
     project.repo_source = inferred_source
     project.repo_branch = branch
+    project.base_url = normalize_base_url(body.base_url)
     db.add(project)
     db.commit()
     db.refresh(project)

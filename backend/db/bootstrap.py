@@ -69,6 +69,12 @@ def _ensure_legacy_column_patches() -> None:
             )
         if "repo_branch" not in project_columns:
             statements.append("ALTER TABLE projects ADD COLUMN repo_branch VARCHAR(255)")
+        if "base_url" not in project_columns:
+            statements.append("ALTER TABLE projects ADD COLUMN base_url VARCHAR(1024)")
+
+    if "ai_async_jobs" not in table_names:
+        # create_all in legacy mode will create from metadata; no ALTER needed.
+        pass
 
     if "users" in table_names:
         user_columns = {col["name"] for col in inspector.get_columns("users")}

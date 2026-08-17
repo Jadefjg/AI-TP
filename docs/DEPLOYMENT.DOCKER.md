@@ -11,7 +11,7 @@
 |------|--------------|------|
 | **web** (Nginx + 前端 dist) | 是 | 静态资源与 TLS/反代边界清晰；多阶段构建不含 Node 运行时 |
 | **api** (Uvicorn) | 是 | 无状态 HTTP；可水平扩副本 |
-| **worker** | 是（与 api **同镜像不同 CMD**） | Run/AI 任务耗时长，避免拖垮 API；可单独扩容 |
+| **worker** | 是（默认可选 **tools 镜像**） | Run/AI 任务耗时长；tools 镜像含 k6 / Playwright / nuclei，缺失工具仍 `skipped` |
 | **mysql** | 是 | 生产禁止 SQLite；数据卷持久化 |
 | **redis** | 是 | RQ 队列 + AI 上下文缓存 |
 
@@ -34,7 +34,8 @@
 | 路径 | 作用 |
 |------|------|
 | `docker-compose.yml` | 一键编排 mysql / redis / api / worker / web（含可配置 `image:` 便于 Hub 推送） |
-| `deploy/Dockerfile` | Python 3.12 应用镜像（含 mysql/redis/worker extras） |
+| `deploy/Dockerfile` | 多阶段：`runtime`（API）+ `worker-tools`（k6 / Playwright / nuclei） |
+| `deploy/Dockerfile.worker-tools` | 兼容别名（推荐直接用 Dockerfile target） |
 | `deploy/Dockerfile.web` | Node 构建前端 + Nginx 托管 |
 | `deploy/nginx/default.conf` | SPA + `/api` 反代 |
 | `deploy/scripts/entrypoint-*.sh` | 等待依赖、迁移、启动进程 |
@@ -154,7 +155,12 @@ docker compose --env-file deploy/.env.docker down -v
 - 可将 `JOB_QUEUE_BACKEND=db`，仍建议保留独立 `worker` 服务  
 - 可去掉对外映射的 MySQL/Redis 端口（编辑 compose `ports`）
 
-### 6.2 生产 HTTPS
+### 6.2 生产 HTTPS / 收紧端口
+
+```bash
+# 不暴露 MySQL/Redis 到宿主机（需 Compose v2.24+）
+docker compose -f docker-compose.yml -f compose.prod.yml --env-file deploy/.env.docker up -d
+```
 
 在宿主机或前置再挂一层 Caddy/Nginx/云 LB 做 443，反代到 `web:80`；或扩展 `web` 服务挂证书。
 
@@ -287,7 +293,8 @@ docker compose --env-file deploy/.env.docker up -d
 
 ## 11. 建议的后续工程化
 
-1. CI：`docker build` 推送 `ghcr.io/<org>/ai-tp-api` / `ai-tp-web`（或 Docker Hub）  
-2. `compose.prod.yml`：去掉 DB/Redis 端口映射、加资源限制  
-3. Worker 可选 `Dockerfile.worker-tools` 安装 k6/Playwright  
-4. 备份 Cron：`mysqldump` + `ai_tp_data` 卷归档  
+1. CI：`docker build` 推送 `ghcr.io/<org>/ai-tp-api` / `ai-tp-worker` / `ai-tp-web`  
+2. 生产叠加：`compose.prod.yml`（已提供：收紧 DB/Redis 端口、建议开启 metrics auth）  
+3. 备份 Cron：`mysqldump` + `ai_tp_data` 卷归档  
+
+Worker 工具镜像已默认启用（`target: worker-tools`）。若构建过慢，可改 `AI_TP_WORKER_TARGET=runtime` 回退为瘦镜像（工具缺失时任务仍 `skipped`）。 

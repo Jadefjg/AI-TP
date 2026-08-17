@@ -13,6 +13,7 @@ from backend.core.config import get_settings
 from backend.core.defaults import DEFAULT_BASE_URL
 from backend.models.entities import (
     AiArtifact,
+    AiAsyncJob,
     AiCallLog,
     K6DispatchJob,
     Project,
@@ -24,6 +25,8 @@ from backend.models.entities import (
 )
 from backend.schemas.dto import (
     AiArtifactOut,
+    AiAsyncJobEnqueueIn,
+    AiAsyncJobOut,
     AiTaskOut,
     AiUsageSummaryOut,
     ApiArtifactScriptUpdate,
@@ -74,6 +77,7 @@ from backend.services.ai.prompt_service import (
     seed_builtin_templates,
 )
 from backend.services.ai.scheduler import run_ai_module
+from backend.services.ai_job_queue import QUEUEABLE_MODULES, enqueue_ai_job
 from backend.services.audit_service import log_action
 from backend.services.api_failure_analyzer import analyze_api_failure
 from backend.services.engines.api_automation import execute_dsl_script
@@ -91,6 +95,7 @@ from backend.services.openapi_discovery import (
     parse_openapi_text,
     wrap_openapi_artifact_payload,
 )
+from backend.services.project_base_url import resolve_project_base_url
 from backend.services.requirement_document import fetch_requirement_from_url, parse_requirement_document
 from backend.services.requirement_pdf import build_requirement_review_pdf
 from backend.services.requirement_report import build_requirement_review_html
@@ -114,6 +119,8 @@ def _project_api_context(project: Project) -> str:
         lines.append(f"默认分支: {project.repo_branch}")
     if project.description:
         lines.append(f"项目描述: {project.description}")
+    sut = resolve_project_base_url(project)
+    lines.append(f"默认被测 Base URL: {sut}")
     if source == "deployed":
         lines.append(f"部署 Base URL: {project.code_root}")
         lines.append("说明: 项目已部署上线，请围绕可访问的服务地址设计接口自动化 DSL。")
@@ -196,6 +203,94 @@ async def _run_requirement_review_agent(
 @router.get("/ai/modules", response_model=list[str], dependencies=[Depends(require_permission("ai.read"))])
 def list_ai_modules() -> list[str]:
     return list_module_types()
+
+
+def _build_ai_job_request(payload: AiAsyncJobEnqueueIn) -> dict:
+    module = payload.module_type.strip()
+    if module not in QUEUEABLE_MODULES:
+        raise HTTPException(status_code=400, detail=f"unsupported module_type: {module}")
+    data = payload.model_dump(exclude_none=True)
+    data.pop("module_type", None)
+    if module == MODULE_REQUIREMENT_REVIEW and not (data.get("requirement_text") or "").strip():
+        raise HTTPException(status_code=400, detail="requirement_text is required")
+    if module == MODULE_FUNCTIONAL_CASES and not (data.get("requirement_text") or "").strip():
+        raise HTTPException(status_code=400, detail="requirement_text is required")
+    if module == MODULE_PERF_PLAN and not (data.get("biz_desc") or "").strip():
+        raise HTTPException(status_code=400, detail="biz_desc is required")
+    return data
+
+
+@router.post(
+    "/projects/{project_id}/ai/jobs",
+    response_model=AiAsyncJobOut,
+    status_code=202,
+    dependencies=[Depends(require_permission("ai.execute"))],
+)
+def enqueue_project_ai_job(
+    body: AiAsyncJobEnqueueIn,
+    project: Project = Depends(get_tenant_project),
+    db: Session = Depends(get_db),
+) -> AiAsyncJob:
+    request_payload = _build_ai_job_request(body)
+    try:
+        job = enqueue_ai_job(
+            db,
+            project=project,
+            module_type=body.module_type.strip(),
+            request_payload=request_payload,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    log_action(
+        db,
+        module="ai",
+        action="ai_job.enqueued",
+        message=f"ai job #{job.id} enqueued ({job.module_type})",
+        detail={"job_id": job.id, "module_type": job.module_type},
+        organization_id=project.organization_id,
+        project_id=project.id,
+    )
+    return job
+
+
+@router.get(
+    "/projects/{project_id}/ai/jobs/{job_id}",
+    response_model=AiAsyncJobOut,
+    dependencies=[Depends(require_permission("ai.read"))],
+)
+def get_project_ai_job(
+    job_id: int,
+    project: Project = Depends(get_tenant_project),
+    db: Session = Depends(get_db),
+) -> AiAsyncJob:
+    job = (
+        db.query(AiAsyncJob)
+        .filter(AiAsyncJob.id == job_id, AiAsyncJob.project_id == project.id)
+        .one_or_none()
+    )
+    if not job:
+        raise HTTPException(status_code=404, detail="ai job not found")
+    return job
+
+
+@router.get(
+    "/projects/{project_id}/ai/jobs",
+    response_model=list[AiAsyncJobOut],
+    dependencies=[Depends(require_permission("ai.read"))],
+)
+def list_project_ai_jobs(
+    project: Project = Depends(get_tenant_project),
+    db: Session = Depends(get_db),
+    limit: int = 20,
+) -> list[AiAsyncJob]:
+    limit = max(1, min(limit, 100))
+    return (
+        db.query(AiAsyncJob)
+        .filter(AiAsyncJob.project_id == project.id)
+        .order_by(AiAsyncJob.id.desc())
+        .limit(limit)
+        .all()
+    )
 
 
 @router.get("/ai/llm-status", response_model=LlmStatusOut, dependencies=[Depends(require_permission("ai.read"))])

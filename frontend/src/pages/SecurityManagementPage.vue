@@ -14,6 +14,7 @@ import {
   rememberPipelineProjectId,
 } from "../constants/aiPipeline";
 import { listTablePagination } from "../constants/listPagination";
+import { resolveProjectBaseUrl } from "../constants/projectDefaults";
 import { usePlatformStore } from "../state/platform";
 import type { AiArtifact, Project } from "../types";
 import { aiSuccessMessage } from "../utils/aiResult";
@@ -37,7 +38,7 @@ const viewVisible = ref(false);
 const viewTitle = ref("产物详情");
 const viewJsonText = ref("");
 const latestExecResult = ref<Record<string, unknown> | null>(null);
-const targetUrl = ref("http://127.0.0.1:8002/system/health");
+const targetUrl = ref("");
 const scanMethod = ref("GET");
 const paramName = ref("q");
 const paramValue = ref("test");
@@ -46,6 +47,10 @@ const tablePagination = listTablePagination(10);
 
 const canAiRead = computed(() => store.hasPermission("ai.read"));
 const canAiExecute = computed(() => store.hasPermission("ai.execute"));
+
+const targetLooksLikeHealthProbe = computed(() =>
+  /\/system\/health\/?$/i.test(targetUrl.value.trim()),
+);
 
 const selectedProject = computed(
   () => projects.value.find((item) => item.id === projectId.value) ?? null,
@@ -154,10 +159,8 @@ const jobReason = (item: Record<string, unknown>) => {
 
 const syncTargetFromProject = (project: Project | null) => {
   if (!project) return;
-  const root = (project.code_root || "").trim().replace(/\/+$/, "");
-  if (project.repo_source === "deployed" && /^https?:\/\//i.test(root)) {
-    targetUrl.value = `${root}/system/health`;
-  }
+  // Prefer project.base_url; do not append /system/health (that scans AI-TP itself).
+  targetUrl.value = resolveProjectBaseUrl(project);
 };
 
 const ensureProject = () => {
@@ -266,11 +269,11 @@ const generateFromProject = () => {
       );
       if (result.persisted_ids?.length) {
         Modal.confirm({
-          title: "流水已走完？",
-          content: "安全策略已入库。可本页发起扫描，或前往任务中心查看历史 Run。",
-          okText: "去任务中心",
-          cancelText: "继续扫描",
-          onOk: () => router.push({ name: "tasks" }),
+          title: "安全策略已入库",
+          content: "策略已生成。请设置扫描目标 URL 后点「发起扫描」；也可稍后再到任务中心查看关联 Run。",
+          okText: "留在本页扫描",
+          cancelText: "去任务中心",
+          onCancel: () => router.push({ name: "tasks" }),
         });
       }
     })
@@ -546,9 +549,18 @@ onMounted(() => {
             <div v-if="canAiExecute" class="ai-field" style="margin-top: 12px">
               <div class="ai-field__label">扫描参数</div>
               <a-space direction="vertical" fill style="width: 100%">
-                <a-input v-model="targetUrl" placeholder="扫描目标 URL">
+                <a-input v-model="targetUrl" placeholder="扫描目标 URL，例如 https://app.example.com/api/login">
                   <template #prefix>Target</template>
                 </a-input>
+                <a-alert
+                  v-if="targetLooksLikeHealthProbe"
+                  type="warning"
+                  show-icon
+                  style="margin-top: 8px"
+                  title="目标像健康检查探针"
+                >
+                  `/system/health` 通常只验证服务存活，安全覆盖面很窄。请改为业务接口或站点首页。
+                </a-alert>
                 <a-space wrap>
                   <a-select v-model="scanMethod" style="width: 110px">
                     <a-option value="GET">GET</a-option>
@@ -556,10 +568,10 @@ onMounted(() => {
                     <a-option value="PUT">PUT</a-option>
                     <a-option value="DELETE">DELETE</a-option>
                   </a-select>
-                  <a-select v-model="securityEngine" style="width: 140px">
-                    <a-option value="builtin">builtin</a-option>
-                    <a-option value="nuclei">nuclei</a-option>
-                    <a-option value="zap">zap</a-option>
+                  <a-select v-model="securityEngine" style="width: 160px">
+                    <a-option value="builtin">builtin（内置）</a-option>
+                    <a-option value="nuclei">nuclei（需安装）</a-option>
+                    <a-option value="zap">zap（需安装）</a-option>
                     <a-option value="combined">combined</a-option>
                   </a-select>
                 </a-space>
@@ -568,7 +580,7 @@ onMounted(() => {
                   <a-input v-model="paramValue" placeholder="参数值" style="width: 180px" />
                 </a-space>
                 <a-typography-paragraph type="secondary" style="margin-bottom: 0">
-                  已部署项目会自动带入访问地址；生成策略后在产物列表点「发起扫描」。
+                  已部署项目会自动带入访问基址；Docker 内请用 `host.docker.internal` 或服务名访问被测系统。nuclei/ZAP 需扩展 Worker 镜像。
                 </a-typography-paragraph>
               </a-space>
             </div>
@@ -666,9 +678,14 @@ onMounted(() => {
             </a-list-item-meta>
             <template #actions>
               <a-button size="mini" type="outline" @click="openReportHtml(Number(item.id))">
-                HTML 报告
+                {{ String(item.status || '') === 'skipped' ? '跳过说明' : 'HTML 报告' }}
               </a-button>
-              <a-button size="mini" type="outline" @click="downloadReportPdf(Number(item.id))">
+              <a-button
+                size="mini"
+                type="outline"
+                :disabled="String(item.status || '') === 'skipped' && !(Array.isArray(item.findings) && item.findings.length)"
+                @click="downloadReportPdf(Number(item.id))"
+              >
                 PDF 报告
               </a-button>
             </template>

@@ -12,7 +12,10 @@ import {
 import { aiApi } from "../../../../api/ai";
 import { useProjectScope } from "../../../../composables/useProjectScope";
 import { DEFAULT_BASE_URL, DEFAULT_HEALTH_URL } from "../../../../constants/platformDefaults";
+import { resolveProjectBaseUrl, resolveProjectHealthUrl } from "../../../../constants/projectDefaults";
 import { usePlatformStore } from "../../../../state/platform";
+import { projectsApi } from "../../../../api/projects";
+import type { Project } from "../../../../types";
 
 export type ProjectAiContext = {
   projectId: ComputedRef<number>;
@@ -158,6 +161,24 @@ export function provideProjectAiContext(): ProjectAiContext {
   watch([() => store.authReady.value, () => store.currentUser.value, projectId], refreshAiData, {
     immediate: true,
   });
+
+  watch(
+    projectId,
+    (id) => {
+      if (!id) return;
+      void store.runBackground(async () => {
+        try {
+          const project = await projectsApi.getProject(id);
+          aiForm.baseUrl = resolveProjectBaseUrl(project as Project);
+          aiForm.targetUrl = resolveProjectHealthUrl(project as Project);
+        } catch {
+          aiForm.baseUrl = DEFAULT_BASE_URL;
+          aiForm.targetUrl = DEFAULT_HEALTH_URL;
+        }
+      });
+    },
+    { immediate: true },
+  );
 
   const ctx: ProjectAiContext = {
     projectId,

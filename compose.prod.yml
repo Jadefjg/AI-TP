@@ -1,0 +1,24 @@
+# Production-oriented overlay for AI-TP.
+# Usage:
+#   docker compose -f docker-compose.yml -f compose.prod.yml --env-file deploy/.env.docker up -d
+#
+# Differences from base compose:
+# - Do not publish MySQL / Redis to the host (Docker network only)
+# - Prefer enabling metrics auth via env
+#
+# Requires Compose v2.24+ for the !reset merge tag.
+
+services:
+  mysql:
+    ports: !reset []
+
+  redis:
+    ports: !reset []
+
+  api:
+    environment:
+      METRICS_AUTH_ENABLED: ${METRICS_AUTH_ENABLED:-true}
+
+  worker:
+    environment:
+      METRICS_AUTH_ENABLED: ${METRICS_AUTH_ENABLED:-true}

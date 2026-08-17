@@ -9,6 +9,8 @@ import { useProjectScope } from "../../../composables/useProjectScope";
 import { useRunPoll } from "../../../composables/useRunPoll";
 import { usePlatformStore } from "../../../state/platform";
 import { DEFAULT_BASE_URL, DEFAULT_HEALTH_URL } from "../../../constants/platformDefaults";
+import { resolveProjectBaseUrl, resolveProjectHealthUrl } from "../../../constants/projectDefaults";
+import { projectsApi } from "../../../api/projects";
 import type { ApiRegressionSet, ReportEmailResult, Run, TestPlan, TestSuite } from "../../../types";
 import "../../../assets/project-section.css";
 
@@ -46,6 +48,26 @@ const runForm = reactive({
   securityMode: "combined",
   securityEngine: "builtin",
 });
+
+watch(
+  projectId,
+  (id) => {
+    if (!id) return;
+    void store.runBackground(async () => {
+      try {
+        const project = await projectsApi.getProject(id);
+        const base = resolveProjectBaseUrl(project);
+        aiForm.baseUrl = base;
+        aiForm.targetUrl = resolveProjectHealthUrl(project);
+        runForm.apiBaseUrl = base;
+        runForm.perfBaseUrl = base;
+      } catch {
+        /* keep defaults */
+      }
+    });
+  },
+  { immediate: true },
+);
 
 const allKinds = [
   { value: "unit", label: "单元测试" },

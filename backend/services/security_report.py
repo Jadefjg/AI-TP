@@ -12,12 +12,13 @@ from fpdf.enums import XPos, YPos
 from backend.models.entities import SecurityScanJob
 
 _FONT_CANDIDATES = (
+    Path("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"),
+    Path("/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc"),
+    Path("/usr/share/fonts/opentype/noto/NotoSansCJKsc-Regular.otf"),
+    Path("/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc"),
     Path("/System/Library/Fonts/Supplemental/Arial Unicode.ttf"),
     Path("/Library/Fonts/Arial Unicode.ttf"),
     Path("/System/Library/Fonts/STHeiti Light.ttc"),
-    Path("/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc"),
-    Path("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"),
-    Path("/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc"),
 )
 
 _STATUS_LABELS = {

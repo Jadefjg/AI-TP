@@ -27,6 +27,8 @@ type RunTask = {
   completed_at: string | null;
   kinds: string[];
   failed_item_count: number;
+  skipped_item_count: number;
+  item_count: number;
 };
 
 const store = usePlatformStore();
@@ -43,19 +45,33 @@ const tablePagination = listTablePagination(10);
 const columns = [
   { title: "运行 ID", dataIndex: "id", width: 72, align: "center" as const },
   { title: "项目", slotName: "project", ellipsis: true, tooltip: true, minWidth: 120 },
-  { title: "状态", slotName: "status", width: 100, align: "center" as const },
+  { title: "状态", slotName: "status", width: 110, align: "center" as const },
   { title: "测试项", slotName: "kinds", width: 200 },
-  { title: "失败项", slotName: "failed", width: 88, align: "center" as const },
+  { title: "失败", slotName: "failed", width: 72, align: "center" as const },
+  { title: "跳过", slotName: "skipped", width: 72, align: "center" as const },
   { title: "创建时间", slotName: "createdAt", width: 168 },
   { title: "操作", slotName: "actions", width: 88, align: "center" as const, fixed: "right" as const },
 ];
 
 const taskCount = computed(() => tasks.value.length);
 
-const statusColor = (status: string) => {
-  if (status === "completed") return "green";
+const isAllSkipped = (record: RunTask) =>
+  record.item_count > 0 &&
+  record.skipped_item_count >= record.item_count &&
+  record.failed_item_count === 0;
+
+const displayStatus = (record: RunTask) => {
+  if (isAllSkipped(record) && record.status === "completed") return "skipped";
+  return record.status;
+};
+
+const statusColor = (record: RunTask) => {
+  const status = displayStatus(record);
+  if (status === "completed" || status === "passed") return "green";
   if (status === "failed") return "red";
   if (status === "running") return "arcoblue";
+  if (status === "skipped") return "orange";
+  if (status === "cancelled") return "orangered";
   return "gray";
 };
 
@@ -161,6 +177,7 @@ onUnmounted(() => {
             <a-option value="pending">等待中</a-option>
             <a-option value="completed">已完成</a-option>
             <a-option value="cancelled">已取消</a-option>
+            <a-option value="skipped">已跳过</a-option>
           </a-select>
           <a-divider direction="vertical" class="tasks-toolbar__divider" />
           <a-switch
@@ -184,7 +201,18 @@ onUnmounted(() => {
     </a-card>
 
     <a-card class="tasks-table-card ai-panel ai-fill-panel" :bordered="false">
+      <div v-if="!pageLoading && !tasks.length" class="ai-empty" style="margin: 24px 16px">
+        <p class="ai-empty__title">暂无运行任务</p>
+        <p class="ai-empty__desc">从项目报告页发起 Run，或在智能流水完成安全/接口/性能扫描后回到这里查看。</p>
+        <a-space style="margin-top: 12px">
+          <a-button type="primary" class="ai-action-btn" @click="router.push({ name: 'projects' })">
+            去项目管理
+          </a-button>
+          <a-button @click="router.push({ name: 'security-management' })">去安全测试</a-button>
+        </a-space>
+      </div>
       <a-table
+        v-else
         :data="tasks"
         :columns="columns"
         row-key="id"
@@ -192,13 +220,16 @@ onUnmounted(() => {
         :stripe="true"
         :loading="pageLoading"
         :pagination="tablePagination"
-        :scroll="{ x: 900 }"
+        :scroll="{ x: 960 }"
       >
         <template #project="{ record }">
           <span class="tasks-project">{{ projectLabel(record) }}</span>
         </template>
         <template #status="{ record }">
-          <a-tag :color="statusColor(record.status)" size="small">{{ runStatusLabel(record.status) }}</a-tag>
+          <a-tag :color="statusColor(record)" size="small">
+            {{ runStatusLabel(displayStatus(record)) }}
+          </a-tag>
+          <div v-if="isAllSkipped(record)" class="tasks-skip-hint">全部跳过</div>
         </template>
         <template #kinds="{ record }">
           <a-space wrap :size="4">
@@ -208,6 +239,11 @@ onUnmounted(() => {
         <template #failed="{ record }">
           <span :class="{ 'tasks-failed-count': record.failed_item_count > 0 }">
             {{ record.failed_item_count }}
+          </span>
+        </template>
+        <template #skipped="{ record }">
+          <span :class="{ 'tasks-skipped-count': record.skipped_item_count > 0 }">
+            {{ record.skipped_item_count }}
           </span>
         </template>
         <template #createdAt="{ record }">
@@ -368,6 +404,19 @@ onUnmounted(() => {
   min-width: 1.5em;
   font-weight: 600;
   color: rgb(var(--red-6));
+}
+
+.tasks-skipped-count {
+  display: inline-block;
+  min-width: 1.5em;
+  font-weight: 600;
+  color: rgb(var(--orange-6));
+}
+
+.tasks-skip-hint {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--color-text-3);
 }
 
 @media (max-width: 768px) {

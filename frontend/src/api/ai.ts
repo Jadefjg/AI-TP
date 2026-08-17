@@ -8,28 +8,91 @@ import type {
 import { downloadBlob, openAuthedHtml, req, reqFormData } from "./client";
 import { DEFAULT_BASE_URL } from "../constants/platformDefaults";
 
+export type AiAsyncJob = {
+  id: number;
+  project_id: number;
+  organization_id?: number | null;
+  module_type: string;
+  status: string;
+  request_payload?: Record<string, unknown> | null;
+  result_payload?: AiTaskResult | null;
+  attempt_count?: number;
+  max_attempts?: number;
+  cancel_requested?: boolean;
+  last_error?: string | null;
+  created_at: string;
+  started_at?: string | null;
+  completed_at?: string | null;
+};
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function pollAiJob(
+  projectId: number,
+  jobId: number,
+  opts?: { intervalMs?: number; timeoutMs?: number },
+): Promise<AiTaskResult> {
+  const intervalMs = opts?.intervalMs ?? 2000;
+  const timeoutMs = opts?.timeoutMs ?? 600_000;
+  const started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    const job = await req<AiAsyncJob>(
+      `/projects/${projectId}/ai/jobs/${jobId}`,
+      undefined,
+      { timeoutMs: 30_000 },
+    );
+    if (job.status === "completed") {
+      if (!job.result_payload) {
+        throw new Error("AI 任务已完成但无结果");
+      }
+      return job.result_payload;
+    }
+    if (job.status === "failed" || job.status === "cancelled") {
+      throw new Error(job.last_error || `AI 任务${job.status === "cancelled" ? "已取消" : "失败"}`);
+    }
+    await sleep(intervalMs);
+  }
+  throw new Error("等待 AI 任务超时，请稍后在任务列表中查看");
+}
+
+async function enqueueAiAndWait(
+  projectId: number,
+  body: Record<string, unknown>,
+): Promise<AiTaskResult> {
+  const job = await req<AiAsyncJob>(
+    `/projects/${projectId}/ai/jobs`,
+    { method: "POST", body: JSON.stringify(body) },
+    { timeoutMs: 30_000 },
+  );
+  return pollAiJob(projectId, job.id);
+}
+
 export const aiApi = {
   getLlmStatus: () =>
     req<{ configured: boolean; provider: string; high_precision_model: string; bulk_model: string }>(
       "/ai/llm-status",
     ),
+  enqueueAiJob: (projectId: number, body: Record<string, unknown>) =>
+    req<AiAsyncJob>(
+      `/projects/${projectId}/ai/jobs`,
+      { method: "POST", body: JSON.stringify(body) },
+      { timeoutMs: 30_000 },
+    ),
+  getAiJob: (projectId: number, jobId: number) =>
+    req<AiAsyncJob>(`/projects/${projectId}/ai/jobs/${jobId}`, undefined, { timeoutMs: 30_000 }),
+  listAiJobs: (projectId: number, limit = 20) =>
+    req<AiAsyncJob[]>(`/projects/${projectId}/ai/jobs?limit=${limit}`),
   aiRequirementReview: (
     projectId: number,
     requirementText: string,
     meta?: { source_filename?: string | null; source_format?: string | null },
   ) =>
-    req<AiTaskResult>(
-      `/projects/${projectId}/ai/requirement-review`,
-      {
-        method: "POST",
-        body: JSON.stringify({
-          requirement_text: requirementText,
-          source_filename: meta?.source_filename ?? null,
-          source_format: meta?.source_format ?? null,
-        }),
-      },
-      { timeoutMs: 120_000 },
-    ),
+    enqueueAiAndWait(projectId, {
+      module_type: "requirement_review",
+      requirement_text: requirementText,
+      source_filename: meta?.source_filename ?? null,
+      source_format: meta?.source_format ?? null,
+    }),
   parseRequirementDocument: (projectId: number, file: File) => {
     const form = new FormData();
     form.append("file", file);
@@ -38,10 +101,14 @@ export const aiApi = {
       form,
     );
   },
-  aiRequirementReviewUpload: (projectId: number, file: File) => {
-    const form = new FormData();
-    form.append("file", file);
-    return reqFormData<AiTaskResult>(`/projects/${projectId}/ai/requirement-review/upload`, form);
+  aiRequirementReviewUpload: async (projectId: number, file: File) => {
+    const parsed = await aiApi.parseRequirementDocument(projectId, file);
+    return enqueueAiAndWait(projectId, {
+      module_type: "requirement_review",
+      requirement_text: parsed.text,
+      source_filename: parsed.filename,
+      source_format: parsed.format,
+    });
   },
   aiRequirementReviewFromUrl: (projectId: number, url: string) =>
     req<AiTaskResult>(
@@ -53,29 +120,21 @@ export const aiApi = {
       { timeoutMs: 120_000 },
     ),
   aiFunctionalCases: (projectId: number, body: { requirement_text: string; openapi_content?: string }) =>
-    req<AiTaskResult>(
-      `/projects/${projectId}/ai/functional-cases`,
-      {
-        method: "POST",
-        body: JSON.stringify({
-          requirement_text: body.requirement_text,
-          openapi_content: body.openapi_content || "",
-        }),
-      },
-      { timeoutMs: 120_000 },
-    ),
+    enqueueAiAndWait(projectId, {
+      module_type: "functional_cases",
+      requirement_text: body.requirement_text,
+      openapi_content: body.openapi_content || "",
+    }),
   aiApiAutomation: (
     projectId: number,
     body: { case_info: string; api_info: string; case_id?: number | null },
   ) =>
-    req<AiTaskResult>(
-      `/projects/${projectId}/ai/api-automation`,
-      {
-        method: "POST",
-        body: JSON.stringify(body),
-      },
-      { timeoutMs: 120_000 },
-    ),
+    enqueueAiAndWait(projectId, {
+      module_type: "api_automation",
+      case_info: body.case_info,
+      api_info: body.api_info,
+      case_id: body.case_id ?? null,
+    }),
   aiOpenApiSpec: (
     projectId: number,
     body?: {
@@ -101,23 +160,16 @@ export const aiApi = {
       { timeoutMs: 120_000 },
     ),
   aiPerfPlan: (projectId: number, body: { biz_desc: string; api_doc?: string }) =>
-    req<AiTaskResult>(
-      `/projects/${projectId}/ai/perf-plan`,
-      {
-        method: "POST",
-        body: JSON.stringify({ biz_desc: body.biz_desc, api_doc: body.api_doc || "" }),
-      },
-      { timeoutMs: 180_000 },
-    ),
+    enqueueAiAndWait(projectId, {
+      module_type: "perf_plan",
+      biz_desc: body.biz_desc,
+      api_doc: body.api_doc || "",
+    }),
   aiSecurityScan: (projectId: number, apiParams: string) =>
-    req<AiTaskResult>(
-      `/projects/${projectId}/ai/security-scan`,
-      {
-        method: "POST",
-        body: JSON.stringify({ api_params: apiParams }),
-      },
-      { timeoutMs: 120_000 },
-    ),
+    enqueueAiAndWait(projectId, {
+      module_type: "security_scan",
+      api_params: apiParams,
+    }),
   listAiArtifacts: (projectId: number, moduleType?: string) => {
     const q = moduleType ? `?module_type=${encodeURIComponent(moduleType)}` : "";
     return req<AiArtifact[]>(`/projects/${projectId}/ai/artifacts${q}`);

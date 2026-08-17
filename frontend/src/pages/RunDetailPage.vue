@@ -73,11 +73,12 @@ const emailAlertTitle = computed(() => {
 });
 
 const itemColumns = [
-  { title: "类型", dataIndex: "kind", width: 120 },
-  { title: "状态", slotName: "status", width: 100 },
+  { title: "类型", dataIndex: "kind", width: 110 },
+  { title: "状态", slotName: "status", width: 90 },
+  { title: "原因", slotName: "reason", ellipsis: true, tooltip: true, minWidth: 160 },
   { title: "退出码", dataIndex: "exit_code", width: 80 },
   { title: "命令", dataIndex: "command", ellipsis: true },
-  { title: "详情", slotName: "detail", width: 120 },
+  { title: "详情", slotName: "detail", width: 200 },
 ];
 
 const RUN_STATUS_LABELS: Record<string, string> = {
@@ -98,8 +99,54 @@ const statusColor = (status: string) => {
   if (status === "failed" || status === "error") return "red";
   if (status === "running") return "arcoblue";
   if (status === "cancelled") return "orange";
-  if (status === "skipped") return "gray";
+  if (status === "skipped") return "orange";
   return "gray";
+};
+
+const itemReason = (record: { detail?: Record<string, unknown> | null; status?: string }) => {
+  const detail = record.detail;
+  if (!detail || typeof detail !== "object") return "";
+  for (const key of ["reason", "message", "error"]) {
+    const v = detail[key];
+    if (typeof v === "string" && v.trim()) return v.trim();
+  }
+  const ai = detail.ai;
+  if (ai && typeof ai === "object" && "detail" in (ai as object)) {
+    const nested = (ai as { detail?: { reason?: unknown } }).detail;
+    if (nested && typeof nested.reason === "string") return nested.reason;
+  }
+  const legacy = detail.legacy;
+  if (legacy && typeof legacy === "object" && "detail" in (legacy as object)) {
+    const nested = (legacy as { detail?: { reason?: unknown } }).detail;
+    if (nested && typeof nested.reason === "string") return nested.reason;
+  }
+  return "";
+};
+
+const securityJobId = (record: { detail?: Record<string, unknown> | null; kind?: string }) => {
+  const detail = record.detail;
+  if (!detail || typeof detail !== "object") return null;
+  const id = detail.security_job_id;
+  if (typeof id === "number" && id > 0) return id;
+  if (typeof id === "string" && Number(id) > 0) return Number(id);
+  return null;
+};
+
+const allItemsSkipped = computed(() => {
+  const items = run.value?.items || [];
+  return (
+    items.length > 0 &&
+    items.every((i) => i.status === "skipped") &&
+    !items.some((i) => i.status === "failed" || i.status === "error")
+  );
+});
+
+const openSecurityReport = (jobId: number) => {
+  const pid = run.value?.project_id;
+  if (!pid) return;
+  void import("../api/ai").then(({ aiApi }) => {
+    aiApi.openSecurityReportHtml(pid, jobId);
+  });
 };
 
 const jobStatus = computed(() => run.value?.execution_job?.status ?? "—");
@@ -458,16 +505,39 @@ onMounted(() => {
         </template>
       </a-alert>
 
+      <a-alert
+        v-if="allItemsSkipped"
+        class="mb-4"
+        type="warning"
+        title="本次 Run 全部测试项已跳过"
+        show-icon
+      >
+        常见原因：Docker 镜像未安装 k6/Playwright/扫描器，或目标地址不可达。报告仅说明环境问题，不代表业务测试通过。
+      </a-alert>
+
       <a-card title="执行项" class="mb-4 ai-panel">
         <a-table :data="run?.items || []" :columns="itemColumns" row-key="id" :pagination="false">
           <template #status="{ record }">
             <a-tag :color="statusColor(record.status)">{{ statusLabel(record.status) }}</a-tag>
           </template>
+          <template #reason="{ record }">
+            <span class="run-item-reason">{{ itemReason(record) || "—" }}</span>
+          </template>
           <template #detail="{ record }">
-            <a-button v-if="record.detail" size="mini" type="outline" @click="openItemDetail(record)">
-              JSON
-            </a-button>
-            <span v-else>—</span>
+            <a-space>
+              <a-button v-if="record.detail" size="mini" type="outline" @click="openItemDetail(record)">
+                JSON
+              </a-button>
+              <a-button
+                v-if="securityJobId(record)"
+                size="mini"
+                type="primary"
+                @click="openSecurityReport(securityJobId(record)!)"
+              >
+                安全报告
+              </a-button>
+              <span v-if="!record.detail && !securityJobId(record)">—</span>
+            </a-space>
           </template>
         </a-table>
       </a-card>
@@ -707,8 +777,9 @@ onMounted(() => {
   border-radius: 10px;
   box-sizing: border-box;
 }
-.run-log-collapse :deep(.arco-collapse-item-content-box) {
-  padding: 12px 16px;
+.run-item-reason {
+  font-size: 12px;
+  color: var(--color-text-2);
 }
 .run-log-collapse :deep(.arco-typography) {
   margin-bottom: 0;
