@@ -18,7 +18,7 @@
 **最佳默认栈（场景 C）：**
 
 ```text
-浏览器 → web:8080
+浏览器 → web:8088
            ├─ /        → frontend/dist
            └─ /api/*   → api:8002
                             ├─ MySQL
@@ -50,7 +50,7 @@
 ### 3.1 前置
 
 - Docker Engine 24+ / Docker Compose v2  
-- 本机端口：`8080`（Web）、可选 `3307`（MySQL 映射）、`6379`（Redis 映射）
+- 本机端口：`8088`（Web）、可选 `3307`（MySQL 映射）、`6380`（Redis 映射）
 
 ### 3.2 配置
 
@@ -71,16 +71,16 @@ docker compose --env-file deploy/.env.docker up -d --build
 
 ```bash
 # 前端
-curl -sI http://127.0.0.1:8080/ | head -5
+curl -sI http://127.0.0.1:8088/ | head -5
 
 # API（经 Nginx）
-curl -s http://127.0.0.1:8080/api/ | head -c 200; echo
+curl -s http://127.0.0.1:8088/api/ | head -c 200; echo
 
 # 直连 API 容器网络外：默认未映射 8002；可用
 docker compose --env-file deploy/.env.docker exec api curl -s http://127.0.0.1:8002/
 ```
 
-浏览器打开：**http://localhost:8080/**  
+浏览器打开：**http://localhost:8088/**  
 默认管理员与登录页一致：`admin` / `admin123456`（由 `BOOTSTRAP_ADMIN_*` 在**首次建库**时写入）。若你改过示例密码，请用该密码登录，或重建数据卷。**登录后立刻改密。**
 
 ### 3.5 常用运维命令
@@ -202,6 +202,10 @@ docker compose --env-file deploy/.env.docker up -d --scale api=2
 | 前端调 API 404 | 确认构建使用 `/api` 且 Nginx `location /api/` 存在 |
 | DB 连接失败 | Compose 内主机名必须是 `mysql` 而非 `127.0.0.1` |
 | 权限/表不存在 | `exec api alembic upgrade head`；`SCHEMA_BOOTSTRAP_MODE=alembic` |
+| worker 构建 `Unable to locate package k6` | 官方 apt 源无 arm64 包（Apple Silicon 常见）。当前 Dockerfile 已改为按架构下载 GitHub 官方二进制 |
+| redis `Bind ... 6379 failed: port is already allocated` | 宿主机 6379 被其他栈/本机 Redis 占用。发布端口已默认改为 `6380`（容器内仍是 `redis:6379`） |
+| web `Bind ... 8080 failed: port is already allocated` | 宿主机 8080 被其他栈占用。发布端口已默认改为 `8088` |
+| 打开 8088 却看到别的系统（如医疗问诊） | 多半是 Nginx 把 `/api` 绝对重定向到了宿主机 `:80`。已改为相对重定向；请访问 http://localhost:8088/login |
 
 ---
 
@@ -281,7 +285,7 @@ docker compose --env-file deploy/.env.docker up -d
 # 不要加 --build，否则会要求本地有构建上下文
 ```
 
-浏览器打开：`http://localhost:8080/`（或 `.env` 中 `WEB_PUBLISH_PORT`）。
+浏览器打开：`http://localhost:8088/`（或 `.env` 中 `WEB_PUBLISH_PORT`）。
 
 ### 10.4 注意
 

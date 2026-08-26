@@ -235,8 +235,8 @@ const generateFromProject = () => {
       if (result.persisted_ids?.length) {
         Modal.confirm({
           title: "继续下一阶段？",
-          content: "压测方案已入库。是否带着当前项目与接口上下文进入安全测试？",
-          okText: "去安全测试",
+          content: "压测方案已入库。是否带着当前项目与接口上下文进入安全 Agent？",
+          okText: "去安全 Agent",
           cancelText: "留在本页",
           onOk: () => {
             rememberPipelineProjectId(projectId.value);
@@ -358,7 +358,7 @@ onMounted(() => {
   <div class="artifact-page ai-workspace">
     <div class="ai-stage">
       <AiWorkspaceHero
-        title="性能测试"
+        title="性能 Agent"
         subtitle="基于当前项目上下文，由 AI 生成并下发 k6 压测方案"
         badge="AI · PERF"
         :status-label="busyActive ? 'Agent 工作中' : `方案 ${artifacts.length} 条`"
@@ -413,14 +413,14 @@ onMounted(() => {
             <div>
               <div class="ai-guide-step__title">下发与流转</div>
               <div class="ai-guide-step__desc">
-                设置 Base URL 后下发 k6；无 Worker 时会 skipped 并保留原因，可继续安全测试。
+                设置 Base URL 后下发 k6；无 Worker 时会 skipped 并保留原因，可继续安全 Agent。
               </div>
             </div>
           </div>
         </div>
         <div class="ai-next-hint">
           <p class="ai-next-hint__title">Next · 流水提示</p>
-          <p class="ai-next-hint__desc">压测方案入库后，可带着项目与接口上下文进入安全测试。</p>
+          <p class="ai-next-hint__desc">压测方案入库后，可带着项目与接口上下文进入安全 Agent。</p>
         </div>
       </div>
     </a-card>

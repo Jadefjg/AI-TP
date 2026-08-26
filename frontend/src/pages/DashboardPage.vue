@@ -117,7 +117,7 @@ onMounted(() => {
 
     <a-card class="ai-panel ai-launch-panel" title="智能流水入口" style="margin-bottom: 16px">
       <a-typography-text type="secondary">
-        建议按顺序推进：需求分析 → 用例 → 接口 → 性能 → 安全。顶栏可切换当前项目，上下文会带到各阶段。
+        建议按顺序推进：需求 Agent → UI Agent → 接口 Agent → 性能 Agent → 安全 Agent。顶栏可切换当前项目，上下文会带到各阶段。
       </a-typography-text>
       <div class="ai-launch" style="margin-top: 14px">
         <button
@@ -139,7 +139,7 @@ onMounted(() => {
         <div class="dash-ai-banner__badge">AI USAGE PULSE</div>
         <div class="dash-ai-banner__title">智能流水实时概览</div>
         <div class="dash-ai-banner__desc">
-          从需求分析到安全扫描，Agent 调用量与 Run 健康度一目了然。
+          从需求 Agent 到安全 Agent（含 Playwright GUI Agent），Agent 调用量与 Run 健康度一目了然。
         </div>
       </div>
       <div class="dash-ai-banner__stat">

@@ -18,7 +18,7 @@ from backend.schemas.dto import (
     OpenApiImportIn,
     RequirementIn,
 )
-from backend.services.agent_workflow import CaseGenerationWorkflow
+from backend.services.agents import requirement_agent
 from backend.services.audit_service import log_action
 from backend.services.case_service import (
     apply_case_update,
@@ -77,9 +77,8 @@ async def generate_cases_agent(
     project: Project = Depends(get_tenant_project),
     db: Session = Depends(get_db),
 ) -> AgentGenerateOut:
-    workflow = CaseGenerationWorkflow()
     try:
-        result = await workflow.run(db, project, body.requirement_text)
+        result = await requirement_agent.generate_cases(db, project, body.requirement_text)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except RuntimeError as e:

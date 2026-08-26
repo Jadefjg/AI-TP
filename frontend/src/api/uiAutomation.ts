@@ -10,7 +10,7 @@ export const uiAutomationApi = {
         body: JSON.stringify({ ui_script: uiScript, base_url: baseUrl }),
       },
     ),
-  executeStep: (
+    executeStep: (
     projectId: number,
     uiScript: unknown,
     stepIndex: number,
@@ -23,6 +23,11 @@ export const uiAutomationApi = {
         step_index: stepIndex,
         base_url: baseUrl,
       }),
+    }),
+  executeAgent: (projectId: number, uiScript: unknown, baseUrl = "http://127.0.0.1:5174") =>
+    req<Record<string, unknown>>(`/projects/${projectId}/ui-automation/execute-agent`, {
+      method: "POST",
+      body: JSON.stringify({ ui_script: uiScript, base_url: baseUrl }),
     }),
   getCaseScript: (projectId: number, caseId: number) =>
     req<{ case_id: number; ui_script: unknown; playwright_code?: string }>(

@@ -487,7 +487,7 @@ onMounted(() => {
             v-if="moduleKey === 'perf_plan'"
             @click="() => router.push({ name: 'perf-management', query: buildPipelineQuery({ projectId }) })"
           >
-            性能测试
+            性能 Agent
           </a-button>
           <a-button type="outline" :loading="store.loading.value" :disabled="!projectId" @click="refreshAll">
             刷新
@@ -519,8 +519,8 @@ onMounted(() => {
             <div class="artifact-field__label">需求评审来源</div>
             <div v-if="!reviews.length" class="ai-empty">
               <p class="ai-empty__title">还没有评审可用来生成</p>
-              <p class="ai-empty__desc">先完成需求分析，再回来让 Agent 产出这一层的测试产物。</p>
-              <a-button type="outline" size="small" @click="goRequirements">去需求分析</a-button>
+              <p class="ai-empty__desc">先完成需求 Agent 评审，再回来让本层 Agent 产出测试产物。</p>
+              <a-button type="outline" size="small" @click="goRequirements">去需求 Agent</a-button>
             </div>
             <a-table
               v-else

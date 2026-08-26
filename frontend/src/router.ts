@@ -19,6 +19,7 @@ const ProjectIntegrationsPage = () => import("./pages/project/ProjectIntegration
 const ProjectUiPage = () => import("./pages/project/ProjectUiPage.vue");
 const RequirementsPage = () => import("./pages/RequirementsPage.vue");
 const CasesPage = () => import("./pages/CasesPage.vue");
+const UiManagementPage = () => import("./pages/UiManagementPage.vue");
 const ApiManagementPage = () => import("./pages/ApiManagementPage.vue");
 const PerfManagementPage = () => import("./pages/PerfManagementPage.vue");
 const SecurityManagementPage = () => import("./pages/SecurityManagementPage.vue");
@@ -88,6 +89,12 @@ const router = createRouter({
           path: "cases",
           name: "cases",
           component: CasesPage,
+          meta: { requiresAuth: true, permission: "case.read" },
+        },
+        {
+          path: "ui-management",
+          name: "ui-management",
+          component: UiManagementPage,
           meta: { requiresAuth: true, permission: "case.read" },
         },
         {

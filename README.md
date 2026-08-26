@@ -7,7 +7,7 @@
 
 支持能力：
 
-1. **五大 AI 模块**：需求预评审、功能用例、接口自动化 DSL、性能压测方案、安全 Payload（统一调度层 + Prompt 模板库）
+1. **七层架构 + 五个专业 Agent**：接入 / 业务 / AI 网关 / 调度 / 执行引擎 / 存储 / 监控；流水线 **需求 Agent → UI Agent → 接口 Agent → 性能 Agent → 安全 Agent**
 2. 需求文本生成功能测试用例（可接 LLM，未配置时回退 stub）
 3. 按项目代码执行多类测试（单元、接口、性能、安全、UI）
 4. 生成测试报告并发送给项目收件人
@@ -148,17 +148,16 @@ SCHEMA_BOOTSTRAP_MODE=alembic   # 启动时仅 seed，不再 create_all/ALTER �
 - 评审项转用例：`POST .../requirement-reviews/{id}/convert-to-cases`
 - 版本对比：`GET .../requirement-reviews/diff?from_id=&to_id=`
 
-## 五大 AI 模块 API（v0.3）
+## 专业 Agent 与 AI 模块 API
 
+- Agent 目录：`GET /ai/agents`（五个专业 Agent + 网关统计 + 覆盖/误报）
+- 需求 Agent：`POST /projects/{id}/ai/requirement-review`；转用例 `POST .../convert-to-cases`；用例生成 `POST .../ai/functional-cases` / `.../functional-cases/generate-agent`
+- UI Agent：`POST /projects/{id}/ui-automation/generate-from-case`、`execute-agent`（Playwright GUI Agent）
 - Prompt 模板：`GET /ai/prompt-templates`，前端 **AI Prompt** 菜单页可视化编辑
-- 需求评审：`POST /projects/{id}/ai/requirement-review`
-- 功能用例：`POST /projects/{id}/ai/functional-cases`（body 含 `openapi_content`）
-- 接口自动化：`POST /projects/{id}/ai/api-automation`
-- 性能方案：`POST /projects/{id}/ai/perf-plan`
-- 安全策略：`POST /projects/{id}/ai/security-scan`
+- 接口 Agent：`POST /projects/{id}/ai/api-automation`；执行 `POST .../ai/artifacts/{aid}/execute`
+- 性能 Agent：`POST /projects/{id}/ai/perf-plan`；下发 `POST .../ai/artifacts/{aid}/dispatch-perf`
+- 安全 Agent：`POST /projects/{id}/ai/security-scan`；扫描 `POST .../ai/artifacts/{aid}/dispatch-security`
 - Token 统计：`GET /ai/usage/summary`
-- DSL 执行：`POST /projects/{id}/ai/artifacts/{aid}/execute`
-- k6 下发：`POST /projects/{id}/ai/artifacts/{aid}/dispatch-perf`
 - 评审 PDF：`GET /projects/{id}/ai/requirement-reviews/{rid}/pdf`
 - Prompt 闭环：`POST /ai/prompt-feedback` → `POST /ai/prompt-templates/apply-suggestions`
 

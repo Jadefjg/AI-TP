@@ -305,7 +305,7 @@ const convertToCases = (reviewId: number) => {
   void store.wrap(async () => {
     const result = await aiApi.convertReviewToCases(projectId.value!, reviewId);
     const suiteHint = result.suite_id ? `，已挂入套件 #${result.suite_id}` : "";
-    Message.success(`已转换 ${result.count} 条用例${suiteHint}，正在进入测试用例`);
+    Message.success(`已转换 ${result.count} 条用例${suiteHint}，正在进入用例落地`);
     rememberPipelineProjectId(projectId.value);
     await router.push({
       name: "cases",
@@ -331,9 +331,9 @@ onMounted(() => {
   <div class="requirements-page ai-workspace">
     <div class="ai-stage">
       <AiWorkspaceHero
-        title="需求分析"
-        subtitle="上传 Word/PDF 或粘贴需求，AI Agent 会结合知识库找出模糊点、逻辑缺口与可测性风险，并引导你进入下一阶段。"
-        badge="AI · REQUIREMENT"
+        title="需求 Agent"
+        subtitle="上传 Word/PDF 或粘贴需求，需求 Agent 结合知识库找出模糊点、逻辑缺口与可测性风险，并可转成功能用例后进入 UI Agent。"
+        badge="AI · REQUIREMENT AGENT"
         :status-label="llmStatusText"
         :status-tone="llmStatusTone"
       >
@@ -350,6 +350,18 @@ onMounted(() => {
             </a-select>
             <a-button type="outline" :loading="store.loading.value" :disabled="!projectId" @click="loadReviews">
               刷新
+            </a-button>
+            <a-button
+              type="outline"
+              :disabled="!projectId"
+              @click="
+                router.push({
+                  name: 'cases',
+                  query: buildPipelineQuery({ projectId: projectId, reviewId: selectedReviewId }),
+                })
+              "
+            >
+              管理用例
             </a-button>
           </a-space>
         </template>
@@ -382,7 +394,7 @@ onMounted(() => {
         <div class="ai-next-hint">
           <p class="ai-next-hint__title">Next · 流水提示</p>
           <p class="ai-next-hint__desc">
-            分析完成后，可一键「转用例」进入测试用例；或沿顶部流水线继续接口 / 性能 / 安全测试。
+            分析完成后，可一键「转用例」落地功能用例；再沿流水线进入 UI Agent / 接口 Agent / 性能 Agent / 安全 Agent。
           </p>
         </div>
       </div>

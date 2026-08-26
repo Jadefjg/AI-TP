@@ -208,7 +208,7 @@ onUnmounted(() => {
           <a-button type="primary" class="ai-action-btn" @click="router.push({ name: 'projects' })">
             去项目管理
           </a-button>
-          <a-button @click="router.push({ name: 'security-management' })">去安全测试</a-button>
+          <a-button @click="router.push({ name: 'security-management' })">去安全 Agent</a-button>
         </a-space>
       </div>
       <a-table

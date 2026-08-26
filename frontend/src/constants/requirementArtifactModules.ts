@@ -45,7 +45,7 @@ export const REQUIREMENT_ARTIFACT_MODULES: Record<
 > = {
   api_automation: {
     key: "api_automation",
-    title: "接口测试",
+    title: "接口 Agent",
     subtitle: "基于当前项目上下文，由 AI 生成接口自动化 DSL",
     routeName: "interface-management",
     path: "/interface-management",
@@ -62,7 +62,7 @@ export const REQUIREMENT_ARTIFACT_MODULES: Record<
       },
       {
         label: "后续动作",
-        text: "本页执行 DSL 后，可一键进入性能测试，用接口产物继续生成压测方案",
+        text: "本页执行 DSL 后，可一键进入性能 Agent，用接口产物继续生成压测方案",
       },
     ],
     generate: (projectId, requirementText, options) => {
@@ -78,7 +78,7 @@ export const REQUIREMENT_ARTIFACT_MODULES: Record<
   },
   perf_plan: {
     key: "perf_plan",
-    title: "性能测试",
+    title: "性能 Agent",
     subtitle: "基于当前项目上下文，由 AI 生成并下发 k6 压测方案",
     routeName: "perf-management",
     path: "/perf-management",
@@ -95,7 +95,7 @@ export const REQUIREMENT_ARTIFACT_MODULES: Record<
       },
       {
         label: "后续动作",
-        text: "下发 k6 后，可继续进入安全测试，基于同一业务上下文生成扫描策略",
+        text: "下发 k6 后，可继续进入安全 Agent，基于同一业务上下文生成扫描策略",
       },
     ],
     generate: (projectId, requirementText, options) => {
@@ -110,7 +110,7 @@ export const REQUIREMENT_ARTIFACT_MODULES: Record<
   },
   security_scan: {
     key: "security_scan",
-    title: "安全测试",
+    title: "安全 Agent",
     subtitle: "基于当前项目：生成安全测试策略 → 执行扫描 → 查看 HTML/PDF 报告",
     routeName: "security-management",
     path: "/security-management",

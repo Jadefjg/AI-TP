@@ -11,7 +11,7 @@ from backend.models.entities import ExecutionJob, ItemStatus, Project, RunStatus
 from backend.services.api_run_service import execute_project_api_dsl, should_use_dsl_api
 from backend.services.audit_service import log_action
 from backend.models.entities import FunctionalCase
-from backend.services.engines.ui_playwright import execute_ui_script
+from backend.services.engines.ui_playwright import execute_ui_agent
 from backend.services.plan_run_service import execute_functional_cases
 from backend.services.perf_run_service import execute_project_perf_k6, should_use_k6_perf
 from backend.services.repo_workspace import resolve_project_code_root
@@ -225,15 +225,26 @@ def execute_run(
                     if bound:
                         ui_script = bound.ui_script
                 if ui_script:
-                    ui_result = execute_ui_script(
+                    ui_result = execute_ui_agent(
                         ui_script,
                         base_url=str((run_options or {}).get("ui_base_url") or "http://127.0.0.1:5173"),
+                        embed_screenshots=False,
                     )
-                    item.command = "playwright://ui-script"
+                    item.command = "playwright://gui-agent"
                     item.exit_code = 0 if ui_result.get("status") == "passed" else 1
                     item.stdout = ui_result.get("stdout")
                     item.stderr = ui_result.get("stderr")
-                    item.detail = ui_result.get("detail")
+                    traces = ui_result.get("traces") if isinstance(ui_result.get("traces"), list) else []
+                    slim_traces = [
+                        {k: v for k, v in row.items() if k != "screenshot_data_url"}
+                        if isinstance(row, dict)
+                        else row
+                        for row in traces
+                    ]
+                    item.detail = {
+                        **(ui_result.get("detail") if isinstance(ui_result.get("detail"), dict) else {}),
+                        "traces": slim_traces,
+                    }
                     st = ui_result.get("status")
                     item.status = (
                         ItemStatus.skipped.value

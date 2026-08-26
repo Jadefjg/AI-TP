@@ -24,6 +24,13 @@ def process_execution_job(job_id: int) -> str:
         db.close()
 
 
+def process_ui_agent_job(ui_script: dict | list, base_url: str) -> dict:
+    """Playwright GUI Agent on Worker (Chromium lives in worker-tools image)."""
+    from backend.services.engines.ui_playwright import execute_ui_agent
+
+    return execute_ui_agent(ui_script, base_url=base_url, embed_screenshots=True)
+
+
 def process_ai_async_job(job_id: int) -> str:
     """执行单条 ai_async_jobs 记录，供 RQ/Celery 调用。"""
     db = SessionLocal()

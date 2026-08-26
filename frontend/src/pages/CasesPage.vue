@@ -222,10 +222,10 @@ const generateWithAgent = () => {
         selectedCaseId.value = result.cases[0].id;
         Modal.confirm({
           title: "继续下一阶段？",
-          content: "用例已入库并挂入智能流水套件。是否继续接口测试，或先执行功能套件？",
-          okText: "去接口测试",
+          content: "用例已入库并挂入智能流水套件。是否继续 UI Agent（Playwright GUI Agent）？",
+          okText: "去 UI Agent",
           cancelText: "留在本页",
-          onOk: () => goInterface(result.cases[0]?.id),
+          onOk: () => goUi(result.cases[0]?.id),
         });
       }
     })
@@ -313,11 +313,11 @@ const goProjectCases = () => {
   void router.push({ name: "project-cases", params: { id: String(projectId.value) } });
 };
 
-const goInterface = (caseId?: number | null) => {
+const goUi = (caseId?: number | null) => {
   const id = caseId ?? selectedCaseId.value ?? displayedCases.value[0]?.id ?? null;
   rememberPipelineProjectId(projectId.value);
   void router.push({
-    name: "interface-management",
+    name: "ui-management",
     query: buildPipelineQuery({
       projectId: projectId.value,
       reviewId: selectedReviewId.value,
@@ -372,9 +372,9 @@ onMounted(() => {
   <div class="cases-page ai-workspace">
     <div class="ai-stage">
       <AiWorkspaceHero
-        title="测试用例"
-        subtitle="挑选需求评审记录，交给 AI Agent 扩写正向 / 异常 / 边界场景；生成后可继续走到接口测试。"
-        badge="AI · TEST CASES"
+        title="需求 Agent · 用例"
+        subtitle="需求 Agent 落地的功能用例：扩写正向 / 异常 / 边界场景后，继续交给 UI Agent（Playwright）。"
+        badge="AI · REQUIREMENT AGENT"
         :status-label="generating ? 'Agent 生成中' : `当前需求 ${displayedCases.length} 条`"
         :status-tone="generating ? 'busy' : 'online'"
       >
@@ -415,7 +415,7 @@ onMounted(() => {
         </template>
       </AiWorkspaceHero>
 
-      <AiPipelineBar current="cases" :handoff="pipelineHandoff" />
+      <AiPipelineBar current="requirements" :handoff="pipelineHandoff" />
     </div>
 
     <AiBusyBanner :active="generating" title="AI Agent 正在生成用例" />
@@ -447,7 +447,7 @@ onMounted(() => {
         </div>
         <div class="ai-next-hint">
           <p class="ai-next-hint__title">Next · 流水提示</p>
-          <p class="ai-next-hint__desc">用例入库后，可带 case_id 进入接口测试，生成并执行 DSL。</p>
+          <p class="ai-next-hint__desc">用例入库后，可带 case_id 进入 UI Agent，由 Playwright GUI Agent 操作页面。</p>
         </div>
       </div>
       <a-collapse v-if="contexts.length" style="margin-top: 12px">
@@ -476,7 +476,7 @@ onMounted(() => {
             <div v-if="!reviews.length" class="ai-empty">
               <p class="ai-empty__title">还没有可生成的评审</p>
               <p class="ai-empty__desc">先到需求管理完成一次 AI 分析，再回来这里一键扩写用例。</p>
-              <a-button type="outline" size="small" @click="goRequirements">去需求分析</a-button>
+              <a-button type="outline" size="small" @click="goRequirements">去需求 Agent</a-button>
             </div>
             <a-table
               v-else
@@ -545,8 +545,8 @@ onMounted(() => {
               >
                 快速生成
               </a-button>
-              <a-button v-if="displayedCases.length" type="outline" @click="() => goInterface()">
-                继续接口测试
+              <a-button v-if="displayedCases.length" type="outline" @click="() => goUi()">
+                继续 UI Agent
               </a-button>
             </a-space>
           </div>
@@ -594,7 +594,7 @@ onMounted(() => {
         </template>
         <template #actions="{ record }">
           <a-space :size="4">
-            <a-button type="text" size="small" @click.stop="goInterface(record.id)">生成接口</a-button>
+            <a-button type="text" size="small" @click.stop="goUi(record.id)">生成 UI</a-button>
             <a-button type="text" size="small" @click.stop="goProjectCases">查看</a-button>
             <a-button
               v-if="canCaseWrite"

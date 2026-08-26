@@ -164,7 +164,7 @@ def _project_api_context(project: Project) -> str:
 
 async def _execute_ai_module(db: Session, job: AiAsyncJob, project: Project) -> dict[str, Any]:
     from backend.services.ai.scheduler import run_ai_module
-    from backend.services.agent_workflow import RequirementReviewWorkflow
+    from backend.services.agents import requirement_agent
 
     req = job.request_payload if isinstance(job.request_payload, dict) else {}
     module = job.module_type
@@ -173,8 +173,7 @@ async def _execute_ai_module(db: Session, job: AiAsyncJob, project: Project) -> 
         text = (req.get("requirement_text") or "").strip()
         if not text:
             raise ValueError("requirement_text is required")
-        workflow = RequirementReviewWorkflow()
-        workflow_result = await workflow.run(
+        workflow_result = await requirement_agent.review(
             db,
             project=project,
             requirement_text=text,
@@ -200,15 +199,11 @@ async def _execute_ai_module(db: Session, job: AiAsyncJob, project: Project) -> 
         return _task_result_to_dict(workflow_result.task, contexts=workflow_result.contexts)
 
     if module == MODULE_FUNCTIONAL_CASES:
-        result = await run_ai_module(
+        result = await requirement_agent.generate_case_artifact(
             db,
-            project=project,
-            module_type=module,
-            variables={
-                "req_content": req.get("requirement_text") or "",
-                "openapi_content": req.get("openapi_content") or "（未提供 OpenAPI 文档）",
-            },
-            use_rag=True,
+            project,
+            requirement_text=req.get("requirement_text") or "",
+            openapi_content=req.get("openapi_content"),
         )
         return _task_result_to_dict(result)
 

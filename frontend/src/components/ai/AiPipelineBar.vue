@@ -192,6 +192,12 @@ const go = (step: AiPipelineStep) => {
   color: rgba(3, 105, 161, 0.55);
 }
 
+@media (max-width: 1280px) {
+  .ai-pipeline__row {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 1100px) {
   .ai-pipeline__row {
     grid-template-columns: repeat(2, minmax(0, 1fr));

@@ -63,9 +63,9 @@ const submit = async () => {
               <div>
                 <div class="login-brand__badge">
                   <span class="login-brand__pulse" />
-                  AI · NEURAL · TEST
+                  AI-TP · TEST PLATFORM
                 </div>
-                <h1 class="login-brand__title">智能测试中枢</h1>
+                <h1 class="login-brand__title">AI 测试平台</h1>
               </div>
             </div>
 

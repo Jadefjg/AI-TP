@@ -15,7 +15,6 @@ from backend.models.entities import (
     AiArtifact,
     AiAsyncJob,
     AiCallLog,
-    K6DispatchJob,
     Project,
     PromptFeedback,
     PromptTemplate,
@@ -64,7 +63,6 @@ from backend.services.ai.constants import (
     MODULE_REQUIREMENT_REVIEW,
     MODULE_SECURITY_SCAN,
 )
-from backend.services.agent_workflow import RequirementReviewWorkflow, RequirementReviewWorkflowResult
 from backend.services.ai.prompt_optimizer import (
     apply_suggestions_to_template,
     build_optimization_suggestions,
@@ -76,15 +74,19 @@ from backend.services.ai.prompt_service import (
     list_module_types,
     seed_builtin_templates,
 )
+from backend.services.agents import (
+    interface_agent,
+    list_agent_manifests,
+    perf_agent,
+    requirement_agent,
+    security_agent,
+)
+from backend.services.agents.metrics import agent_quality_stats
+from backend.services.ai.gateway import gateway_stats
 from backend.services.ai.scheduler import run_ai_module
 from backend.services.ai_job_queue import QUEUEABLE_MODULES, enqueue_ai_job
 from backend.services.audit_service import log_action
 from backend.services.api_failure_analyzer import analyze_api_failure
-from backend.services.engines.api_automation import execute_dsl_script
-from backend.services.engines.k6_scheduler import dispatch_perf_plan_distributed
-from backend.services.engines.perf_k6 import dispatch_perf_plan
-from backend.services.engines.security_adapters import run_external_security_engine
-from backend.services.engines.security_scanner import ScanTarget, execute_security_scan, normalize_security_job_status
 from backend.services.security_report import build_security_scan_html, build_security_scan_pdf
 from backend.services.ai.prompt_optimizer import record_feedback
 from backend.services.openapi_discovery import (
@@ -99,10 +101,7 @@ from backend.services.project_base_url import resolve_project_base_url
 from backend.services.requirement_document import fetch_requirement_from_url, parse_requirement_document
 from backend.services.requirement_pdf import build_requirement_review_pdf
 from backend.services.requirement_report import build_requirement_review_html
-from backend.services.requirement_review_service import (
-    convert_review_to_cases,
-    diff_requirement_reviews,
-)
+from backend.services.requirement_review_service import diff_requirement_reviews
 from backend.services.tenant_service import get_project_for_user
 
 router = APIRouter(tags=["ai"])
@@ -131,20 +130,6 @@ def _project_api_context(project: Project) -> str:
     return "\n".join(lines)
 
 
-def _extract_security_strategies(payload: object) -> list:
-    if isinstance(payload, list):
-        return [item for item in payload if isinstance(item, dict)]
-    if not isinstance(payload, dict):
-        return []
-    for key in ("strategies", "items", "payload", "results", "scans"):
-        value = payload.get(key)
-        if isinstance(value, list):
-            return [item for item in value if isinstance(item, dict)]
-    if any(k in payload for k in ("vul_type", "test_payload", "scan_strategy")):
-        return [payload]
-    return []
-
-
 def _to_task_out(result, *, contexts: list[dict] | None = None) -> AiTaskOut:
     return AiTaskOut(
         module_type=result.module_type,
@@ -157,7 +142,7 @@ def _to_task_out(result, *, contexts: list[dict] | None = None) -> AiTaskOut:
     )
 
 
-def _to_requirement_agent_out(workflow_result: RequirementReviewWorkflowResult) -> AiTaskOut:
+def _to_requirement_agent_out(workflow_result) -> AiTaskOut:
     return _to_task_out(workflow_result.task, contexts=workflow_result.contexts)
 
 
@@ -172,11 +157,10 @@ async def _run_requirement_review_agent(
     message: str,
     detail: dict | None = None,
 ) -> AiTaskOut:
-    workflow = RequirementReviewWorkflow()
     try:
-        workflow_result = await workflow.run(
+        workflow_result = await requirement_agent.review(
             db,
-            project=project,
+            project,
             requirement_text=requirement_text,
             source_filename=source_filename,
             source_format=source_format,
@@ -203,6 +187,27 @@ async def _run_requirement_review_agent(
 @router.get("/ai/modules", response_model=list[str], dependencies=[Depends(require_permission("ai.read"))])
 def list_ai_modules() -> list[str]:
     return list_module_types()
+
+
+@router.get("/ai/agents", dependencies=[Depends(require_permission("ai.read"))])
+def list_test_agents(db: Session = Depends(get_db)) -> dict:
+    """Access-layer catalog of specialized test Agents."""
+    return {
+        "agents": [
+            {
+                "key": item.key,
+                "label": item.label,
+                "module_type": item.module_type,
+                "engine": item.engine,
+                "generate": item.generate,
+                "execute": item.execute,
+                "layer": item.layer,
+            }
+            for item in list_agent_manifests()
+        ],
+        "gateway": gateway_stats(),
+        "quality": agent_quality_stats(db),
+    }
 
 
 def _build_ai_job_request(payload: AiAsyncJobEnqueueIn) -> dict:
@@ -652,7 +657,7 @@ def convert_review_items_to_cases(
     if not review:
         raise HTTPException(status_code=404, detail="requirement review not found")
     sections = payload.sections if payload else None
-    created, suite_id = convert_review_to_cases(db, review, sections=sections)
+    created, suite_id = requirement_agent.convert_to_cases(db, review, sections=sections)
     log_action(
         db,
         module="ai",
@@ -678,15 +683,11 @@ async def ai_functional_cases(
     db: Session = Depends(get_db),
 ) -> AiTaskOut:
     try:
-        result = await run_ai_module(
+        result = await requirement_agent.generate_case_artifact(
             db,
-            project=project,
-            module_type=MODULE_FUNCTIONAL_CASES,
-            variables={
-                "req_content": payload.requirement_text,
-                "openapi_content": payload.openapi_content or "（未提供 OpenAPI 文档）",
-            },
-            use_rag=True,
+            project,
+            requirement_text=payload.requirement_text,
+            openapi_content=payload.openapi_content,
         )
     except (ValueError, RuntimeError) as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
@@ -710,16 +711,13 @@ async def ai_api_automation(
     case_info = (payload.case_info or "").strip() or (
         "基于当前项目整体能力，覆盖主流程与异常断言，生成接口自动化场景。"
     )
-    variables = {"case_info": case_info, "api_info": api_info}
-    if payload.case_id is not None:
-        variables["case_id"] = str(payload.case_id)
     try:
-        result = await run_ai_module(
+        result = await interface_agent.generate(
             db,
-            project=project,
-            module_type=MODULE_API_AUTOMATION,
-            variables=variables,
-            use_rag=True,
+            project,
+            case_info=case_info,
+            api_info=api_info,
+            case_id=payload.case_id,
         )
     except (ValueError, RuntimeError) as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
@@ -912,12 +910,11 @@ async def ai_perf_plan(
         biz_desc = f"{project_ctx}\n\n{biz_desc}"
     api_doc = (payload.api_doc or "").strip() or "（未提供额外接口文档）"
     try:
-        result = await run_ai_module(
+        result = await perf_agent.generate(
             db,
-            project=project,
-            module_type=MODULE_PERF_PLAN,
-            variables={"biz_desc": biz_desc, "api_doc": api_doc},
-            use_rag=True,
+            project,
+            biz_desc=biz_desc,
+            api_doc=api_doc,
         )
     except (ValueError, RuntimeError) as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
@@ -941,13 +938,7 @@ async def ai_security_scan(
     if project_ctx not in api_params:
         api_params = f"{project_ctx}\n\n{api_params}"
     try:
-        result = await run_ai_module(
-            db,
-            project=project,
-            module_type=MODULE_SECURITY_SCAN,
-            variables={"api_params": api_params},
-            use_rag=True,
-        )
+        result = await security_agent.generate(db, project, api_params=api_params)
     except (ValueError, RuntimeError) as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     return _to_task_out(result)
@@ -994,7 +985,7 @@ def execute_api_artifact(
         payload.get("script_content") or ""
     )
     base_url = (body.base_url if body else None) or DEFAULT_BASE_URL
-    result = execute_dsl_script(script, base_url=base_url)
+    result = interface_agent.execute(script, base_url=base_url)
     log_action(
         db,
         module="engines",
@@ -1061,7 +1052,7 @@ async def analyze_api_artifact_failure(
     base_url = opts.base_url or DEFAULT_BASE_URL
     execution_result = opts.execution_result
     if execution_result is None or opts.rerun:
-        execution_result = execute_dsl_script(script, base_url=base_url)
+        execution_result = interface_agent.execute(script, base_url=base_url)
     if execution_result.get("status") == "passed":
         return {
             "skipped": True,
@@ -1108,52 +1099,18 @@ def dispatch_perf_artifact(
     plan = artifact.payload if isinstance(artifact.payload, dict) else {}
     base_url = (body.base_url if body else None) or DEFAULT_BASE_URL
     use_distributed = bool(body.distributed) if body and body.distributed is not None else False
-    settings = get_settings()
-    if use_distributed and settings.k6_distributed_enabled:
-        capped = dict(plan)
-        capped["duration"] = min(int(capped.get("duration") or 15), 15)
-        capped["warmup"] = min(int(capped.get("warmup") or 0), 3)
-        result = dispatch_perf_plan_distributed(
-            db, capped, project_id=project.id, artifact_id=artifact_id, base_url=base_url
-        )
-    else:
-        result = dispatch_perf_plan(
-            plan,
-            project_id=project.id,
-            artifact_id=artifact_id,
-            base_url=base_url,
-            interactive=True,
-        )
-        status = str(result.get("status") or "failed")
-        job_status = (
-            "completed"
-            if status == "passed"
-            else ("skipped" if status == "skipped" else "failed")
-        )
-        job = K6DispatchJob(
-            project_id=project.id,
-            artifact_id=artifact_id,
-            status=job_status,
-            plan_snapshot=plan if isinstance(plan, dict) else {},
-            node_results=[
-                {
-                    "mode": "local-direct",
-                    **{k: v for k, v in result.items() if k != "generated_script_preview"},
-                }
-            ],
-            master_script_path=str(result.get("script_path") or ""),
-            summary_metrics=result.get("summary_metrics"),
-            time_series=result.get("time_series") or [],
-            execution_segments=[],
-        )
-        db.add(job)
-        db.commit()
-        db.refresh(job)
-        result = {**result, "job_id": job.id, "mode": "local-direct"}
+    result = perf_agent.execute(
+        db,
+        project,
+        artifact_id=artifact_id,
+        plan=plan,
+        base_url=base_url,
+        distributed=use_distributed,
+    )
     log_action(
         db,
-        module="engines",
-        action="perf_k6.dispatch",
+        module="agents",
+        action="perf_agent.execute",
         message=f"artifact #{artifact_id} k6 dispatched",
         detail={"status": result.get("status")},
     )
@@ -1232,67 +1189,22 @@ def dispatch_security_artifact(
     if artifact.module_type != MODULE_SECURITY_SCAN:
         raise HTTPException(status_code=400, detail="only security_scan artifacts can be dispatched")
 
-    strategies = _extract_security_strategies(artifact.payload)
-
-    settings = get_settings()
-    target = ScanTarget(
-        url=body.target_url,
+    result = security_agent.execute(
+        db,
+        project,
+        artifact_id=artifact_id,
+        payload=artifact.payload,
+        target_url=body.target_url,
+        engine=body.engine,
         method=body.method,
         headers=body.headers,
         query_params=body.query_params,
         body_params=body.body_params,
     )
-    findings: list[dict] = []
-    engines_used: list[str] = []
-    result: dict = {"status": "passed", "findings": [], "detail": {}}
-
-    if body.engine in {"nuclei", "zap"}:
-        ext = run_external_security_engine(body.engine, body.target_url)
-        engines_used.append(body.engine)
-        findings.extend(ext.get("findings") or [])
-        result = ext
-    elif body.engine == "combined":
-        ext_n = run_external_security_engine("nuclei", body.target_url)
-        engines_used.append("nuclei")
-        findings.extend(ext_n.get("findings") or [])
-        builtin = execute_security_scan(
-            strategies,
-            target,
-            max_payloads_per_type=settings.security_scan_max_payloads,
-            delay_ms=settings.security_scan_delay_ms,
-        )
-        engines_used.append("builtin")
-        findings.extend(builtin.get("findings") or [])
-        result = builtin
-    else:
-        result = execute_security_scan(
-            strategies,
-            target,
-            max_payloads_per_type=settings.security_scan_max_payloads,
-            delay_ms=settings.security_scan_delay_ms,
-        )
-        engines_used.append("builtin")
-        findings = result.get("findings") or []
-
-    status = normalize_security_job_status(result, findings)
-
-    job = SecurityScanJob(
-        project_id=project.id,
-        artifact_id=artifact_id,
-        target_url=body.target_url,
-        engine=",".join(engines_used) or body.engine,
-        status=status,
-        findings=findings,
-        detail={**(result.get("detail") or {}), "engines": engines_used},
-    )
-    db.add(job)
-    db.commit()
-    db.refresh(job)
-    result["job_id"] = job.id
     log_action(
         db,
-        module="engines",
-        action="security_scan.dispatch",
+        module="agents",
+        action="security_agent.execute",
         message=f"artifact #{artifact_id} security scan",
         detail={"finding_count": len(result.get("findings") or [])},
     )

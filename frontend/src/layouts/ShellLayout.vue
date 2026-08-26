@@ -40,11 +40,11 @@ const navEntries: Array<NavLeaf | NavGroup> = [
     key: "ai-pipeline",
     label: "智能流水",
     children: [
-      { to: "/requirements", label: "01 需求分析", permission: "ai.read" },
-      { to: "/cases", label: "02 测试用例", permission: "case.read" },
-      { to: "/interface-management", label: "03 接口测试", permission: "ai.read" },
-      { to: "/perf-management", label: "04 性能测试", permission: "ai.read" },
-      { to: "/security-management", label: "05 安全测试", permission: "ai.read" },
+      { to: "/requirements", label: "01 需求 Agent", permission: "ai.read" },
+      { to: "/ui-management", label: "02 UI Agent", permission: "case.read" },
+      { to: "/interface-management", label: "03 接口 Agent", permission: "ai.read" },
+      { to: "/perf-management", label: "04 性能 Agent", permission: "ai.read" },
+      { to: "/security-management", label: "05 安全 Agent", permission: "ai.read" },
     ],
   },
   {
@@ -136,6 +136,7 @@ const isPipelineRoute = computed(() =>
   [
     "/requirements",
     "/cases",
+    "/ui-management",
     "/interface-management",
     "/perf-management",
     "/security-management",
@@ -286,6 +287,7 @@ const onMenuClick = (key: string) => {
   const pipelineKeys = [
     "/requirements",
     "/cases",
+    "/ui-management",
     "/interface-management",
     "/perf-management",
     "/security-management",

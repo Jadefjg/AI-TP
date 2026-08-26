@@ -45,7 +45,8 @@ CMD ["/entrypoint-api.sh"]
 FROM runtime AS worker-tools
 
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
-    NUCLEI_VERSION=v3.3.7
+    NUCLEI_VERSION=v3.3.7 \
+    K6_VERSION=v2.2.0
 
 USER root
 
@@ -53,7 +54,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates \
       curl \
       unzip \
-      gnupg \
       libnss3 \
       libnspr4 \
       libatk1.0-0 \
@@ -73,12 +73,21 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       fonts-liberation \
     && rm -rf /var/lib/apt/lists/*
 
-RUN curl -fsSL https://dl.k6.io/key.gpg | gpg --dearmor -o /usr/share/keyrings/k6-archive-keyring.gpg \
-    && echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" \
-       > /etc/apt/sources.list.d/k6.list \
-    && apt-get update \
-    && apt-get install -y --no-install-recommends k6 \
-    && rm -rf /var/lib/apt/lists/*
+# Official dl.k6.io apt repo is amd64-only; GitHub releases include linux arm64.
+RUN ARCH="$(uname -m)" \
+    && case "$ARCH" in \
+         x86_64|amd64) KARCH=amd64 ;; \
+         aarch64|arm64) KARCH=arm64 ;; \
+         *) echo "unsupported arch: $ARCH" >&2; exit 1 ;; \
+       esac \
+    && curl -fsSL \
+         "https://github.com/grafana/k6/releases/download/${K6_VERSION}/k6-${K6_VERSION}-linux-${KARCH}.tar.gz" \
+         -o /tmp/k6.tar.gz \
+    && mkdir -p /tmp/k6 \
+    && tar -xzf /tmp/k6.tar.gz -C /tmp/k6 --strip-components=1 \
+    && install -m 0755 /tmp/k6/k6 /usr/local/bin/k6 \
+    && rm -rf /tmp/k6 /tmp/k6.tar.gz \
+    && k6 version
 
 RUN ARCH="$(uname -m)" \
     && case "$ARCH" in \

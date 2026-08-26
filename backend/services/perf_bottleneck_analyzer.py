@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from backend.models.entities import K6DispatchJob, Project
 from backend.services.ai.json_utils import parse_json_payload
-from backend.services.ai.llm_client import chat_completion
+from backend.services.ai.gateway import complete as chat_completion
 
 
 async def analyze_perf_bottleneck(

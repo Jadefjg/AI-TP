@@ -1,18 +1,36 @@
 # AI 测试 SaaS 平台架构（ai-tp v0.8）
 
-## 分层
+平台按七层落地，业务侧以 **需求 Agent / UI Agent / 接口 Agent / 性能 Agent / 安全 Agent** 作为生成与执行门面；HTTP 路由只做校验与编排，不直接调用引擎。
 
-| 层级 | 当前实现 | 规划演进 |
-|------|----------|----------|
-| 前端 | Vue3 + Arco Design + Vite | 监控大盘、AI 对话工作台 |
-| 后端 API | FastAPI：项目/用例/运行/报告/RBAC/AI | 版本、任务编排 API |
-| **AI 调度中间层** | `backend/services/ai/`：模型路由、Prompt 模板、Token 日志、修正闭环 | 队列化、多租户计费 |
-| 测试引擎 | `api_automation` DSL（与 `start_run(api)` 打通）、`perf_k6` k6 下发 | 分布式压测节点、安全扫描器 |
-| 存储 | SQLite / MySQL + Alembic；Redis（队列/缓存） | 生产集群 |
-| 任务队列 | `execution_jobs` + 多后端 Worker（db/redis/rq/celery） | 多租户配额、死信队列 |
-| 可观测性 | Prometheus `/metrics`、请求 Trace 头、可选 OTLP | 统一 APM 大盘 |
+## 七层结构
 
-## 五大 AI 业务模块
+| 层级 | 职责 | 当前实现 |
+|------|------|----------|
+| 接入层 | API、前端页面、CI | FastAPI `/api`、Vue3 智能流水、`POST /integrations/ci/{id}/webhook` |
+| 业务服务层 | 用例 / 任务 / 智能回归 / AI 生成 / 失败分析 | `backend/services/` + 五个 Agent（`backend/services/agents/`） |
+| AI 网关层 | LLM 统一入口、调用统计、失败计数 | `backend/services/ai/gateway.py`（`complete` → `llm_client`；不缓存生成结果） |
+| 调度层 | 任务队列、分布式压测、资源分配 | `job_queue` / `ai_job_queue` / `k6_scheduler`（`JOB_QUEUE_BACKEND`） |
+| 执行引擎层 | Playwright GUI Agent、API DSL、k6、安全扫描、容器隔离 | `backend/services/engines/*`；Worker 镜像隔离执行 |
+| 存储层 | 库表 + 截图 / 视频 / 日志 | MySQL/SQLite + `data/ui-agent/` 等对象目录 |
+| 监控指标层 | 覆盖率、误报率、HTTP/Run 指标 | `GET /ai/agents` 的 `quality`；Prometheus `GET /metrics` |
+
+## 五个专业 Agent
+
+流水线顺序：**需求 Agent → UI Agent → 接口 Agent → 性能 Agent → 安全 Agent**。
+
+| Agent | `key` | 生成 | 执行引擎 | 接入 API |
+|------|-------|------|----------|----------|
+| 需求 Agent | `requirement` | LLM → 需求评审 / 功能用例 | 评审项转用例 | `POST .../ai/requirement-review`、`.../functional-cases`、`.../convert-to-cases` |
+| UI Agent | `ui` | 功能用例 → Playwright DSL | Playwright GUI Agent | `POST .../ui-automation/generate-from-case`、`execute-agent` |
+| 接口 Agent | `interface` | LLM → YAML DSL 产物 | HTTP DSL runner | `POST .../ai/api-automation`、`.../artifacts/{id}/execute` |
+| 性能 Agent | `perf` | LLM → k6 压测方案 | k6 local / distributed | `POST .../ai/perf-plan`、`.../dispatch-perf` |
+| 安全 Agent | `security` | LLM → Payload / 扫描策略 | builtin / nuclei / zap | `POST .../ai/security-scan`、`.../dispatch-security` |
+
+目录：`GET /ai/agents`（含网关统计 `gateway` 与覆盖/误报 `quality`）。工具缺失时执行结果为 `skipped` 并带 `detail.reason`，不硬崩溃。
+
+## 五大 AI 业务模块（Prompt / 产物）
+
+需求分析与功能用例由 **需求 Agent** 封装；后四个模块由对应 Agent 封装 `run_ai_module`。
 
 | 模块 | `module_type` | API |
 |------|---------------|-----|
@@ -23,6 +41,18 @@
 | 安全策略 | `security_scan` | `POST /projects/{id}/ai/security-scan` |
 
 Prompt 维护：`GET/POST/PATCH /ai/prompt-templates`，启动时种子 5 套内置模板。
+
+## 分层补充
+
+| 层级 | 当前实现 | 规划演进 |
+|------|----------|----------|
+| 前端 | Vue3 + Arco Design + Vite；智能流水 01–05 | 监控大盘、Agent 质量看板 |
+| 后端 API | FastAPI：项目/用例/运行/报告/RBAC/AI；根路径健康 JSON | 版本、任务编排 API |
+| **AI 网关** | `gateway.complete`：模型路由、Token 日志仍在 scheduler | 限流、多租户计费 |
+| 测试引擎 | Playwright / API DSL / k6 / 安全扫描器 | 更细的容器配额 |
+| 存储 | SQLite / MySQL + Alembic；Redis（队列/缓存） | 生产集群 |
+| 任务队列 | `execution_jobs` + 多后端 Worker（db/redis/rq/celery） | 多租户配额、死信队列 |
+| 可观测性 | Prometheus `/metrics`、请求 Trace 头、可选 OTLP；Agent `quality` | 统一 APM 大盘 |
 
 ## 模型路由
 

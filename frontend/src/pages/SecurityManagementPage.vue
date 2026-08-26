@@ -393,7 +393,7 @@ onMounted(() => {
   <div class="artifact-page ai-workspace">
     <div class="ai-stage">
       <AiWorkspaceHero
-        title="安全测试"
+        title="安全 Agent"
         subtitle="基于当前项目：生成安全测试策略 → 执行扫描 → 查看 HTML/PDF 报告"
         badge="AI · SECURITY"
         :status-label="busyActive ? 'Agent 工作中' : `策略 ${artifacts.length} · 扫描 ${securityJobs.length}`"

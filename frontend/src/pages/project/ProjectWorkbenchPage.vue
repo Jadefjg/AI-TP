@@ -9,11 +9,11 @@ const store = usePlatformStore();
 const { projectId } = useProjectScope();
 
 const modules = [
-  { value: "functional_cases", label: "功能用例" },
-  { value: "requirement_review", label: "需求评审" },
-  { value: "api_automation", label: "接口测试" },
-  { value: "perf_plan", label: "性能测试" },
-  { value: "security_scan", label: "安全测试" },
+  { value: "requirement_review", label: "需求 Agent" },
+  { value: "functional_cases", label: "需求 Agent · 用例" },
+  { value: "api_automation", label: "接口 Agent" },
+  { value: "perf_plan", label: "性能 Agent" },
+  { value: "security_scan", label: "安全 Agent" },
 ];
 
 const sessions = ref<WorkbenchSession[]>([]);

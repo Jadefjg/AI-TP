@@ -22,8 +22,9 @@ const scriptJson = ref(
 );
 const preview = ref<Record<string, unknown> | null>(null);
 const stepResult = ref<Record<string, unknown> | null>(null);
+const agentResult = ref<Record<string, unknown> | null>(null);
 const stepIndex = ref(0);
-const busyAction = ref<"" | "generate" | "preview" | "step" | "save">("");
+const busyAction = ref<"" | "generate" | "preview" | "step" | "agent" | "save">("");
 
 const selectedCase = computed(
   () => cases.value.find((row) => row.id === selectedCaseId.value) ?? null,
@@ -194,6 +195,36 @@ const runStep = () => {
     });
 };
 
+const runAgent = () => {
+  if (stepCount.value <= 0) {
+    Message.warning("请先生成或预览步骤，再交给 Playwright GUI Agent 执行");
+    return;
+  }
+  const uiScript = parseScriptJson();
+  if (!uiScript) return;
+  busyAction.value = "agent";
+  void store
+    .wrap(async () => {
+      const baseUrl = scriptBaseUrl(uiScript);
+      const payload = withResolvedBase(uiScript, baseUrl);
+      syncEditorBaseUrl(baseUrl);
+      agentResult.value = await uiAutomationApi.executeAgent(projectId.value, payload, baseUrl);
+      const status = String(agentResult.value?.status || "");
+      if (status === "skipped") {
+        Message.warning((agentResult.value?.detail as { reason?: string } | undefined)?.reason || "Agent 已跳过");
+        return;
+      }
+      if (status === "failed" || status === "error") {
+        Message.error((agentResult.value?.detail as { reason?: string } | undefined)?.reason || "GUI Agent 执行失败");
+        return;
+      }
+      Message.success("Playwright GUI Agent 已跑完");
+    })
+    .finally(() => {
+      busyAction.value = "";
+    });
+};
+
 const saveScript = () => {
   if (!selectedCaseId.value) {
     Message.warning("请先选择左侧用例");
@@ -255,7 +286,7 @@ onMounted(() => void loadCases());
         </div>
         <div v-if="!cases.length" class="ai-empty">
           <p class="ai-empty__title">暂无功能用例</p>
-          <p class="ai-empty__desc">UI 脚本需绑定到功能用例。请先在「01 用例」生成或导入用例。</p>
+          <p class="ai-empty__desc">UI 脚本需绑定到功能用例。请先在「01 需求 Agent」生成或导入用例。</p>
           <a-button type="primary" class="ai-action-btn" size="small" @click="goCases">去用例管理</a-button>
         </div>
         <a-list v-else size="small" :bordered="false">
@@ -280,7 +311,7 @@ onMounted(() => void loadCases());
         </div>
         <a-alert type="info" show-icon style="margin-bottom: 12px">
           这里编排浏览器自动化脚本：先选左侧用例 →「从用例生成」或手写 JSON →「预览步骤」核对 →
-          用「步骤序号」指定要跑的一步再「单步执行」。
+          用「步骤序号」指定要跑的一步再「单步执行」，或一键「GUI Agent 执行」。
         </a-alert>
 
         <div class="ui-toolbar">
@@ -308,12 +339,19 @@ onMounted(() => void loadCases());
             </span>
           </div>
           <a-button
-            type="primary"
-            class="ai-action-btn"
+            type="outline"
             :loading="busyAction === 'step'"
             @click="runStep"
           >
             单步执行
+          </a-button>
+          <a-button
+            type="primary"
+            class="ai-action-btn"
+            :loading="busyAction === 'agent'"
+            @click="runAgent"
+          >
+            GUI Agent 执行
           </a-button>
           <a-button
             type="outline"
@@ -357,6 +395,10 @@ onMounted(() => void loadCases());
         <div v-if="stepResult" class="ui-result-block">
           <div class="ai-section-title">单步执行结果</div>
           <pre class="ai-payload" style="max-height: 180px">{{ JSON.stringify(stepResult, null, 2) }}</pre>
+        </div>
+        <div v-if="agentResult" class="ui-result-block">
+          <div class="ai-section-title">GUI Agent 结果</div>
+          <pre class="ai-payload" style="max-height: 220px">{{ JSON.stringify(agentResult, null, 2) }}</pre>
         </div>
       </a-card>
     </a-col>

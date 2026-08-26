@@ -486,8 +486,8 @@ const generateFromProject = () => {
       if (result.persisted_ids?.length) {
         Modal.confirm({
           title: "继续下一阶段？",
-          content: "接口测试已入库。是否带着当前项目上下文进入性能测试？",
-          okText: "去性能测试",
+          content: "接口产物已入库。是否带着当前项目上下文进入性能 Agent？",
+          okText: "去性能 Agent",
           cancelText: "留在本页",
           onOk: () => {
             rememberPipelineProjectId(projectId.value);
@@ -605,7 +605,7 @@ onMounted(() => {
   <div class="artifact-page ai-workspace">
     <div class="ai-stage">
       <AiWorkspaceHero
-        title="接口测试"
+        title="接口 Agent"
         subtitle="基于当前项目上下文，由 AI 生成并执行接口自动化 DSL"
         badge="AI · API DSL"
         :status-label="busyActive ? 'Agent 工作中' : `产物 ${artifacts.length} 条`"
@@ -660,14 +660,14 @@ onMounted(() => {
             <div>
               <div class="ai-guide-step__title">执行与流转</div>
               <div class="ai-guide-step__desc">
-                设置 Base URL 后执行 DSL；也可进入项目 AI 调试，或继续性能测试。
+                设置 Base URL 后执行 DSL；也可进入项目 AI 调试，或继续性能 Agent。
               </div>
             </div>
           </div>
         </div>
         <div class="ai-next-hint">
           <p class="ai-next-hint__title">Next · 流水提示</p>
-          <p class="ai-next-hint__desc">DSL 入库后，可带着项目上下文进入性能测试生成 k6 压测方案。</p>
+          <p class="ai-next-hint__desc">DSL 入库后，可带着项目上下文进入性能 Agent 生成 k6 压测方案。</p>
         </div>
       </div>
     </a-card>
@@ -727,7 +727,7 @@ onMounted(() => {
                     ? `将使用用例「${selectedCase.title}」细化场景`
                     : functionalCases.length
                       ? "未绑定时按项目上下文直接生成"
-                      : "暂无用例也可直接按项目生成；需要更细场景时可先到测试用例"
+                      : "暂无用例也可直接按项目生成；需要更细场景时可先到需求 Agent"
                 }}
               </a-typography-paragraph>
             </div>

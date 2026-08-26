@@ -15,7 +15,7 @@ from backend.models.entities import (
     RequirementReview,
 )
 from backend.services.ai.constants import AI_MODULES, MODULE_FUNCTIONAL_CASES, MODULE_REQUIREMENT_REVIEW
-from backend.services.ai.llm_client import chat_completion
+from backend.services.ai.gateway import complete as chat_completion
 from backend.services.ai.scheduler import run_ai_module
 from backend.services.rag_service import retrieve_context_chunks_async
 from backend.services.tenant_service import assert_ai_token_quota, get_organization

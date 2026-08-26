@@ -20,7 +20,8 @@ from backend.services.ai.constants import (
 from backend.services.ai.context_cache import append_context, set_context
 from backend.services.ai.json_utils import parse_json_payload, parse_requirement_review_response
 from backend.api.request_context import get_current_user_optional
-from backend.services.ai.llm_client import LlmResult, chat_completion
+from backend.services.ai.gateway import complete as chat_completion
+from backend.services.ai.llm_client import LlmResult
 from backend.core.config import get_settings
 from backend.services.ai.stubs import _functional_cases_stub
 from backend.services.credential_service import get_project_llm_override
