@@ -1,7 +1,7 @@
 # AI-TP 容器化部署指导方案
 
 > 配套文件：根目录 `docker-compose.yml`、`deploy/`  
-> 总览部署见 [DEPLOYMENT.md](./DEPLOYMENT.md)
+> 总览部署见 [DEPLOYMENT.md](./DEPLOYMENT.md) · 阿里云 ECS 见 [DEPLOYMENT.ALIYUN.md](./DEPLOYMENT.ALIYUN.md)
 
 ---
 
@@ -40,6 +40,7 @@
 | `deploy/nginx/default.conf` | SPA + `/api` 反代 |
 | `deploy/scripts/entrypoint-*.sh` | 等待依赖、迁移、启动进程 |
 | `deploy/scripts/push-images.sh` | 构建并推送 api/web 镜像到 Docker Hub（等） |
+| `deploy/scripts/aliyun-deploy.sh` | ECS 一键 `up --build` / `--prod` / `--pull` |
 | `deploy/.env.docker.example` | 容器环境变量模板（含 `AI_TP_*_IMAGE`） |
 | `.dockerignore` | 缩小构建上下文、避免打入 `.env`/venv |
 

@@ -16,14 +16,15 @@
 | 密钥 | `.env`（LLM、SMTP、OIDC、Stripe、飞书等） | **严禁进镜像/仓库**；用环境变量或密钥托管 |
 | 前端代理 | 开发态 Vite `/api` → 后端 | 生产由 Nginx 反代，或把 `VITE_API_BASE_URL` 指到公网 API |
 | CI | GitHub Actions：pytest + `npm run build` | 可直接接到「构建 → 发版」流水线 |
-| 容器化 | 见 [DEPLOYMENT.DOCKER.md](./DEPLOYMENT.DOCKER.md) 与根目录 `docker-compose.yml` | **推荐默认：Compose 一键部署** |
+| 容器化 | 见 [DEPLOYMENT.DOCKER.md](./DEPLOYMENT.DOCKER.md)、[DEPLOYMENT.ALIYUN.md](./DEPLOYMENT.ALIYUN.md) 与根目录 `docker-compose.yml` | **推荐默认：Compose 一键部署** |
 
 **结论：**  
 - 短平快演示：单机 + SQLite + API 内嵌 Worker。  
 - **推荐生产默认：** Docker Compose（Nginx + API + Worker + MySQL + Redis）。  
 - 高并发/多租户：再拆多副本 API、RQ/Celery Worker、对象存储与独立 k6 节点。
 
-完整容器步骤 → **[DEPLOYMENT.DOCKER.md](./DEPLOYMENT.DOCKER.md)**。
+完整容器步骤 → **[DEPLOYMENT.DOCKER.md](./DEPLOYMENT.DOCKER.md)**。  
+阿里云 ECS 专项 → **[DEPLOYMENT.ALIYUN.md](./DEPLOYMENT.ALIYUN.md)**。
 
 ---
 
@@ -222,36 +223,35 @@ server {
 
 ---
 
-## 6. 容器化路线（建议下一迭代补齐）
+## 6. 容器化部署（已落地）
 
-当前仓库无镜像定义，**最佳工程化路径**是补：
+仓库已提供完整 Compose 栈，**生产推荐优先走 Docker**，无需再手工装 MySQL/Redis/Nginx。
 
-```text
-deploy/
-  Dockerfile.api
-  Dockerfile.worker
-  Dockerfile.web          # 或仅构建阶段产出 dist + nginx
-  docker-compose.yml      # mysql + redis + api + worker + nginx
-  nginx.conf
+| 路径 | 作用 |
+|------|------|
+| `docker-compose.yml` | mysql / redis / api / worker / web |
+| `compose.prod.yml` | 生产叠加：不暴露 MySQL/Redis 端口、默认开启 metrics 鉴权 |
+| `deploy/Dockerfile` | API（`runtime`）+ Worker（`worker-tools`：k6 / Playwright / nuclei） |
+| `deploy/Dockerfile.web` | 多阶段构建前端 + Nginx |
+| `deploy/.env.docker.example` | 容器环境变量模板 |
+| `deploy/scripts/aliyun-deploy.sh` | ECS 一键 `up --build` / `--prod` |
+
+**快速启动（本机或云主机）：**
+
+```bash
+cp deploy/.env.docker.example deploy/.env.docker
+# 编辑密钥、LLM Key、域名相关 URL
+
+docker compose --env-file deploy/.env.docker up -d --build
+
+# 生产（不映射 DB/Redis 到宿主机）
+docker compose -f docker-compose.yml -f compose.prod.yml \
+  --env-file deploy/.env.docker up -d --build
 ```
 
-**Compose 服务建议**
-
-| Service | 镜像角色 |
-|---------|----------|
-| `mysql` | 官方 MySQL 8，挂载 volume |
-| `redis` | 官方 Redis 7 |
-| `api` | `uvicorn backend.main:app`，`JOB_WORKER_IN_API=false` |
-| `worker` | `python -m backend.worker`，同代码镜像不同 command |
-| `web` | Nginx + 构建好的 `frontend/dist` |
-
-要点：
-
-1. **多阶段构建**前端，最终镜像不含 `node_modules`。  
-2. **密钥仅 env / secrets**，不 COPY `.env`。  
-3. `data/`、MySQL data 用 named volume。  
-4. 健康检查：API `GET /` 或 `/docs`；依赖 `alembic upgrade head` 作 migration job / entrypoint。  
-5. CI（已有 pytest + build）可扩展：`docker build` + 推送 GHCR。
+**阿里云 ECS** 完整步骤（安全组、镜像加速、HTTPS、备份）→ **[DEPLOYMENT.ALIYUN.md](./DEPLOYMENT.ALIYUN.md)**。  
+容器细节与故障排查 → **[DEPLOYMENT.DOCKER.md](./DEPLOYMENT.DOCKER.md)**。  
+推送镜像到 Docker Hub / ACR → **[DOCKER_HUB.md](./DOCKER_HUB.md)**。
 
 ---
 
@@ -284,12 +284,12 @@ deploy/
 
 | 优先级 | 事项 | 产出 |
 |--------|------|------|
-| P0 | 按「场景 B/C」单机部署跑通 | 可对内访问的环境 |
+| P0 | Docker Compose 场景 C 跑通（或 [阿里云 ECS](./DEPLOYMENT.ALIYUN.md)） | 可对外/对内访问 |
 | P0 | 改密、CORS、SMTP/LLM、备份 | 安全与可用性 |
-| P1 | 补 Docker Compose + Nginx 模板 | 一键部署 |
-| P1 | systemd 单元或 Compose restart 策略 | 进程守护 |
-| P2 | CI 推镜像、多 Worker、k6 节点 | 扩容 |
-| P2 | HTTPS 证书自动化、指标鉴权、审计 | 合规 |
+| P1 | `compose.prod.yml` + HTTPS（SLB/Caddy） | 生产加固 |
+| P1 | CI 推镜像至 Hub/ACR | 可重复发版 |
+| P2 | 多 Worker 副本、k6 分布式节点 | 扩容 |
+| P2 | 指标鉴权、审计导出、OIDC | 合规 |
 
 ---
 
@@ -309,5 +309,5 @@ deploy/
 
 ## 11. 一句话决策
 
-**正式对外：Nginx（HTTPS）+ 构建后的前端 + FastAPI（8002）+ 独立 Worker + MySQL + Redis（RQ）。**  
-先无「单机手动/systemd」上线，同步补齐 Compose，再按负载加副本与专用压测节点。
+**正式对外（推荐）：Docker Compose + `compose.prod.yml`（Web + API + Worker + MySQL + Redis/RQ），前置 HTTPS。**  
+无 Docker 时见 §5 单机 systemd 路径；阿里云见 [DEPLOYMENT.ALIYUN.md](./DEPLOYMENT.ALIYUN.md)。

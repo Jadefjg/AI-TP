@@ -144,12 +144,12 @@ docker compose --env-file deploy/.env.docker up -d
 验证：
 
 ```bash
-curl -sI http://127.0.0.1:8080/ | head -5
-curl -s http://127.0.0.1:8080/api/ | head -c 200; echo
+curl -sI http://127.0.0.1:8088/ | head -5
+curl -s http://127.0.0.1:8088/api/ | head -c 200; echo
 ```
 
-浏览器打开：**http://localhost:8080/**  
-（端口以 `.env.docker` 里 `WEB_PUBLISH_PORT` 为准。）
+浏览器打开：**http://localhost:8088/**  
+（端口以 `.env.docker` 里 `WEB_PUBLISH_PORT` 为准，默认 `8088`。）
 
 常用运维：
 
