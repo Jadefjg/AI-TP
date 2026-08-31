@@ -77,3 +77,7 @@ test-results/
 # --- Optional local overrides ---
 *.local
 docker-compose.override.yml
+
+
+
+ali.txt
