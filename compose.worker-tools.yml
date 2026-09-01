@@ -1,0 +1,22 @@
+# Full worker image: Playwright Chromium + k6 + nuclei.
+# First build often takes 15–30 minutes (large browser download).
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f compose.worker-tools.yml up -d --build
+#
+# Or set in deploy/.env.docker:
+#   AI_TP_WORKER_IMAGE=ai-tp-worker:local
+#   AI_TP_WORKER_TARGET=worker-tools
+
+services:
+  worker:
+    image: ${AI_TP_WORKER_IMAGE:-ai-tp-worker:local}
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile
+      target: worker-tools
+      args:
+        DEBIAN_MIRROR: ${DEBIAN_MIRROR:-}
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-}
+    environment:
+      PLAYWRIGHT_BROWSERS_PATH: /ms-playwright

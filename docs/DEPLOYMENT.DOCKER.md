@@ -41,7 +41,8 @@
 | `deploy/scripts/entrypoint-*.sh` | 等待依赖、迁移、启动进程 |
 | `deploy/scripts/push-images.sh` | 构建并推送 api/web 镜像到 Docker Hub（等） |
 | `deploy/scripts/aliyun-deploy.sh` | ECS 一键 `up --build` / `--prod` / `--pull` |
-| `deploy/.env.docker.example` | 容器环境变量模板（含 `AI_TP_*_IMAGE`） |
+| `compose.local.yml` | 本地加速：国内 apt/npm 镜像 |
+| `compose.worker-tools.yml` | 完整 Worker（Playwright/k6/nuclei，构建慢） |
 | `.dockerignore` | 缩小构建上下文、避免打入 `.env`/venv |
 
 ---
@@ -65,7 +66,14 @@ cp deploy/.env.docker.example deploy/.env.docker
 ### 3.3 构建并启动
 
 ```bash
-docker compose --env-file deploy/.env.docker up -d --build
+# 默认：瘦 worker 复用 api 镜像，首次约 2–5 分钟
+docker compose up -d --build
+
+# 国内网络加速（阿里云 apt / npmmirror npm）
+docker compose -f docker-compose.yml -f compose.local.yml up -d --build
+
+# 需要 Worker 内跑 Playwright / k6 / nuclei 时再启用（首次约 15–30 分钟）
+docker compose -f docker-compose.yml -f compose.worker-tools.yml up -d --build
 ```
 
 ### 3.4 验证
@@ -302,4 +310,4 @@ docker compose --env-file deploy/.env.docker up -d
 2. 生产叠加：`compose.prod.yml`（已提供：收紧 DB/Redis 端口、建议开启 metrics auth）  
 3. 备份 Cron：`mysqldump` + `ai_tp_data` 卷归档  
 
-Worker 工具镜像已默认启用（`target: worker-tools`）。若构建过慢，可改 `AI_TP_WORKER_TARGET=runtime` 回退为瘦镜像（工具缺失时任务仍 `skipped`）。 
+Worker 默认复用 **api（runtime）镜像**，本地构建只编 api + web。需要 Playwright/k6/nuclei 时使用 `compose.worker-tools.yml`（工具缺失时任务仍 `skipped`）。 

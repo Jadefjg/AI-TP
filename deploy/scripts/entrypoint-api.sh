@@ -1,6 +1,8 @@
 #!/bin/sh
 set -eu
 
+. /resolve-database-url.sh
+
 echo "[api] waiting for database..."
 python - <<'PY'
 import os, time, sys

@@ -145,6 +145,56 @@ def user_has_permission(user: User, code: str) -> bool:
     return code in collect_permission_codes(user)
 
 
+def register_user(
+    db: Session,
+    *,
+    username: str,
+    password: str,
+    display_name: str | None = None,
+    email: str | None = None,
+) -> User:
+    from backend.services.member_service import bind_member_to_organization
+    from backend.services.tenant_service import seed_default_organization
+
+    settings = get_settings()
+    if not settings.auth_registration_enabled:
+        raise ValueError("registration is disabled")
+
+    normalized_username = username.strip()
+    if not normalized_username:
+        raise ValueError("username is required")
+    if normalized_username == settings.bootstrap_admin_username:
+        raise ValueError("username is reserved")
+
+    exists = db.query(User).filter(User.username == normalized_username).one_or_none()
+    if exists:
+        raise ValueError("username already exists")
+
+    member_role = db.query(Role).filter(Role.name == "member").one_or_none()
+    if not member_role:
+        seed_auth_defaults(db)
+        member_role = db.query(Role).filter(Role.name == "member").one()
+
+    org = seed_default_organization(db)
+    user = User(
+        username=normalized_username,
+        display_name=(display_name or "").strip() or normalized_username,
+        email=email,
+        password_hash=hash_password(password),
+        is_active=True,
+    )
+    db.add(user)
+    db.flush()
+    bind_member_to_organization(db, org=org, user=user, role_ids=[member_role.id])
+    db.commit()
+    return (
+        db.query(User)
+        .options(selectinload(User.roles).selectinload(Role.permissions))
+        .filter(User.id == user.id)
+        .one()
+    )
+
+
 def change_user_password(db: Session, user: User, current_password: str, new_password: str) -> None:
     if not verify_password(current_password, user.password_hash):
         raise ValueError("current password is incorrect")
@@ -193,6 +243,13 @@ def seed_auth_defaults(db: Session) -> None:
         db.flush()
         changed = True
     elif not admin_user.password_hash:
+        admin_user.password_hash = hash_password(settings.bootstrap_admin_password)
+        changed = True
+    elif (
+        settings.bootstrap_admin_sync_password
+        and settings.bootstrap_admin_password
+        and not verify_password(settings.bootstrap_admin_password, admin_user.password_hash)
+    ):
         admin_user.password_hash = hash_password(settings.bootstrap_admin_password)
         changed = True
     if "admin" not in {role.name for role in admin_user.roles}:

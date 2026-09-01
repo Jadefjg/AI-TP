@@ -50,7 +50,8 @@ RUN mkdir -p /app/data /app/data/mail_outbox
 
 COPY deploy/scripts/entrypoint-api.sh /entrypoint-api.sh
 COPY deploy/scripts/entrypoint-worker.sh /entrypoint-worker.sh
-RUN chmod +x /entrypoint-api.sh /entrypoint-worker.sh
+COPY deploy/scripts/resolve-database-url.sh /resolve-database-url.sh
+RUN chmod +x /entrypoint-api.sh /entrypoint-worker.sh /resolve-database-url.sh
 
 EXPOSE 8002
 
@@ -94,8 +95,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Official dl.k6.io apt repo is amd64-only; GitHub releases include linux arm64.
 RUN ARCH="$(uname -m)" \
     && case "$ARCH" in \
-         x86_64|amd64) KARCH=amd64 ;; \
-         aarch64|arm64) KARCH=arm64 ;; \
+         x86_64|amd64) KARCH=amd64; NARCH=amd64 ;; \
+         aarch64|arm64) KARCH=arm64; NARCH=arm64 ;; \
          *) echo "unsupported arch: $ARCH" >&2; exit 1 ;; \
        esac \
     && curl -fsSL \
@@ -105,25 +106,18 @@ RUN ARCH="$(uname -m)" \
     && tar -xzf /tmp/k6.tar.gz -C /tmp/k6 --strip-components=1 \
     && install -m 0755 /tmp/k6/k6 /usr/local/bin/k6 \
     && rm -rf /tmp/k6 /tmp/k6.tar.gz \
-    && k6 version
-
-RUN ARCH="$(uname -m)" \
-    && case "$ARCH" in \
-         x86_64|amd64) NARCH=amd64 ;; \
-         aarch64|arm64) NARCH=arm64 ;; \
-         *) echo "unsupported arch: $ARCH" >&2; exit 1 ;; \
-       esac \
     && curl -fsSL \
          "https://github.com/projectdiscovery/nuclei/releases/download/${NUCLEI_VERSION}/nuclei_${NUCLEI_VERSION#v}_linux_${NARCH}.zip" \
          -o /tmp/nuclei.zip \
     && unzip -o /tmp/nuclei.zip -d /tmp/nuclei \
     && install -m 0755 /tmp/nuclei/nuclei /usr/local/bin/nuclei \
     && rm -rf /tmp/nuclei /tmp/nuclei.zip \
+    && k6 version \
     && nuclei -version
 
-RUN mkdir -p /ms-playwright \
-    && python -m playwright install chromium \
-    && k6 version \
+RUN --mount=type=cache,target=/root/.cache/ms-playwright \
+    mkdir -p /ms-playwright \
+    && PLAYWRIGHT_BROWSERS_PATH=/ms-playwright python -m playwright install chromium \
     && python -c "import playwright; print('playwright ok')"
 
 CMD ["/entrypoint-worker.sh"]

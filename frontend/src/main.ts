@@ -10,5 +10,6 @@ app.use(router);
 app.use(ArcoVue);
 
 void router.isReady().then(() => {
+  sessionStorage.removeItem("ai-tp:chunk-reload");
   app.mount("#app");
 });

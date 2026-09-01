@@ -7,12 +7,13 @@ from backend.api.auth import get_current_user
 from backend.api.request_context import current_user_ctx
 from backend.db.session import get_db
 from backend.models.entities import User
-from backend.schemas.dto import AuthTokenOut, ChangePasswordIn, LoginChallengeOut, LoginIn, UserOut, UserProfileUpdate
+from backend.schemas.dto import AuthTokenOut, ChangePasswordIn, LoginChallengeOut, LoginIn, RegisterIn, UserOut, UserProfileUpdate
 from backend.services.audit_service import log_action
 from backend.services.auth_service import (
     authenticate_user,
     change_user_password,
     create_access_token,
+    register_user,
     revoke_access_token,
 )
 from backend.services.login_crypto_service import (
@@ -63,6 +64,34 @@ def login(body: LoginIn, db: Session = Depends(get_db)) -> AuthTokenOut:
         module="auth",
         action="auth.login",
         message=f"user {user.username} logged in",
+        detail={"user_id": user.id},
+    )
+    return AuthTokenOut(access_token=access_token, expires_in_sec=expires_in_sec, user=user)
+
+
+@router.post("/register", response_model=AuthTokenOut)
+def register(body: RegisterIn, db: Session = Depends(get_db)) -> AuthTokenOut:
+    try:
+        password = decrypt_login_password(body.challenge_id, body.encrypted_password)
+    except LoginCryptoError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    try:
+        user = register_user(
+            db,
+            username=body.username,
+            password=password,
+            display_name=body.display_name,
+            email=body.email,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    current_user_ctx.set(user)
+    access_token, expires_in_sec = create_access_token(db, user)
+    log_action(
+        db,
+        module="auth",
+        action="auth.register",
+        message=f"user {user.username} registered",
         detail={"user_id": user.id},
     )
     return AuthTokenOut(access_token=access_token, expires_in_sec=expires_in_sec, user=user)

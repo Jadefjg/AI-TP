@@ -1,7 +1,5 @@
 # Overlay for 2 vCPU / ~2 GiB ECS (e.g. Aliyun entry-level).
-# Do not build worker-tools (Playwright/k6) on this spec — set in .env.docker:
-#   AI_TP_WORKER_IMAGE=ai-tp-api:local
-#   AI_TP_WORKER_TARGET=runtime
+# Worker reuses api image — no worker-tools build on low-spec hosts.
 #
 # Usage:
 #   docker compose -f docker-compose.yml -f compose.prod.yml -f compose.small.yml \
@@ -32,10 +30,6 @@ services:
 
   worker:
     mem_limit: 384m
-    build:
-      args:
-        DEBIAN_MIRROR: mirrors.aliyun.com
-        PIP_INDEX_URL: https://mirrors.aliyun.com/pypi/simple/
 
   web:
     mem_limit: 64m

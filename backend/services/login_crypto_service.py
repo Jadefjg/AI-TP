@@ -6,6 +6,7 @@ import logging
 import secrets
 import time
 from dataclasses import dataclass
+from typing import Any
 
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
@@ -17,6 +18,11 @@ logger = logging.getLogger(__name__)
 
 _CHALLENGES: dict[str, float] = {}
 _PRIVATE_KEY: RSAPrivateKey | None = None
+_REDIS_CLIENT: Any | None = None
+_REDIS_CHECKED = False
+
+_CHALLENGE_KEY_PREFIX = "ai-tp:login:challenge:"
+_PRIVATE_KEY_REDIS_KEY = "ai-tp:login-crypto:private-key"
 
 
 class LoginCryptoError(ValueError):
@@ -32,6 +38,27 @@ class LoginChallenge:
     expires_in_sec: int
 
 
+def _redis_client() -> Any | None:
+    global _REDIS_CLIENT, _REDIS_CHECKED
+    if _REDIS_CHECKED:
+        return _REDIS_CLIENT
+    _REDIS_CHECKED = True
+    url = (get_settings().redis_url or "").strip()
+    if not url:
+        return None
+    try:
+        import redis  # type: ignore[import-untyped]
+
+        client = redis.from_url(url, decode_responses=True)
+        client.ping()
+        _REDIS_CLIENT = client
+        logger.info("Login crypto: using Redis for challenges and shared RSA key")
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Login crypto: Redis unavailable (%s), using in-memory", exc)
+        _REDIS_CLIENT = None
+    return _REDIS_CLIENT
+
+
 def _ttl_sec() -> int:
     return max(get_settings().auth_login_challenge_ttl_sec, 60)
 
@@ -44,8 +71,45 @@ def _purge_expired_challenges() -> None:
         _CHALLENGES.pop(key, None)
 
 
+def _serialize_private_key(key: RSAPrivateKey) -> str:
+    pem = key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption(),
+    )
+    return pem.decode("ascii")
+
+
+def _deserialize_private_key(pem: str) -> RSAPrivateKey:
+    loaded = serialization.load_pem_private_key(pem.encode("ascii"), password=None)
+    if not isinstance(loaded, RSAPrivateKey):
+        raise LoginCryptoError("invalid RSA private key")
+    return loaded
+
+
 def _private_key() -> RSAPrivateKey:
     global _PRIVATE_KEY
+    if _PRIVATE_KEY is not None:
+        return _PRIVATE_KEY
+
+    client = _redis_client()
+    if client:
+        pem = client.get(_PRIVATE_KEY_REDIS_KEY)
+        if pem:
+            _PRIVATE_KEY = _deserialize_private_key(pem)
+            return _PRIVATE_KEY
+        key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        pem = _serialize_private_key(key)
+        if client.set(_PRIVATE_KEY_REDIS_KEY, pem, nx=True):
+            logger.info("generated shared RSA key pair for login encryption (Redis)")
+            _PRIVATE_KEY = key
+            return _PRIVATE_KEY
+        stored = client.get(_PRIVATE_KEY_REDIS_KEY)
+        if not stored:
+            raise LoginCryptoError("failed to initialize login encryption key")
+        _PRIVATE_KEY = _deserialize_private_key(stored)
+        return _PRIVATE_KEY
+
     if _PRIVATE_KEY is None:
         _PRIVATE_KEY = rsa.generate_private_key(public_exponent=65537, key_size=2048)
         logger.info("generated ephemeral RSA key pair for login encryption")
@@ -60,10 +124,34 @@ def _public_key_spki_b64() -> str:
     return base64.b64encode(public_bytes).decode("ascii")
 
 
-def issue_login_challenge() -> LoginChallenge:
+def _store_challenge(challenge_id: str) -> None:
+    client = _redis_client()
+    if client:
+        client.setex(f"{_CHALLENGE_KEY_PREFIX}{challenge_id}", _ttl_sec(), "1")
+        return
     _purge_expired_challenges()
-    challenge_id = secrets.token_urlsafe(24)
     _CHALLENGES[challenge_id] = time.time()
+
+
+def _consume_challenge(challenge_id: str) -> bool:
+    if not challenge_id:
+        return False
+    client = _redis_client()
+    if client:
+        deleted = client.delete(f"{_CHALLENGE_KEY_PREFIX}{challenge_id}")
+        return int(deleted) > 0
+    _purge_expired_challenges()
+    created_at = _CHALLENGES.pop(challenge_id, None)
+    if created_at is None:
+        return False
+    if time.time() - created_at > _ttl_sec():
+        return False
+    return True
+
+
+def issue_login_challenge() -> LoginChallenge:
+    challenge_id = secrets.token_urlsafe(24)
+    _store_challenge(challenge_id)
     return LoginChallenge(
         challenge_id=challenge_id,
         public_key=_public_key_spki_b64(),
@@ -74,15 +162,7 @@ def issue_login_challenge() -> LoginChallenge:
 
 
 def consume_login_challenge(challenge_id: str) -> bool:
-    if not challenge_id:
-        return False
-    _purge_expired_challenges()
-    created_at = _CHALLENGES.pop(challenge_id, None)
-    if created_at is None:
-        return False
-    if time.time() - created_at > _ttl_sec():
-        return False
-    return True
+    return _consume_challenge(challenge_id)
 
 
 def decrypt_challenge_payload(challenge_id: str, encrypted_b64: str) -> dict:
@@ -170,6 +250,8 @@ def encrypt_change_password_for_tests(
 
 
 def reset_login_crypto_state_for_tests() -> None:
-    global _PRIVATE_KEY
+    global _PRIVATE_KEY, _REDIS_CHECKED, _REDIS_CLIENT
     _CHALLENGES.clear()
     _PRIVATE_KEY = None
+    _REDIS_CHECKED = False
+    _REDIS_CLIENT = None

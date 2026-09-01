@@ -106,6 +106,18 @@ const login = async (body: { username: string; password: string }) => {
   output.value = "";
 };
 
+const register = async (body: {
+  username: string;
+  password: string;
+  display_name?: string | null;
+  email?: string | null;
+}) => {
+  const session = await authApi.register(body);
+  authStore.setToken(session.access_token);
+  currentUser.value = session.user;
+  output.value = "";
+};
+
 const logout = async () => {
   try {
     await authApi.logout();
@@ -144,6 +156,7 @@ export function usePlatformStore() {
     runBackground,
     bootstrapSession,
     login,
+    register,
     logout,
     refreshCurrentUser,
     applySession,

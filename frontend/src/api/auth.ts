@@ -17,6 +17,25 @@ export const authApi = {
       }),
     });
   },
+  register: async (body: {
+    username: string;
+    password: string;
+    display_name?: string | null;
+    email?: string | null;
+  }) => {
+    const challenge = await req<LoginChallenge>("/auth/login-challenge");
+    const encrypted_password = await encryptLoginPassword(challenge, body.password);
+    return req<AuthSession>("/auth/register", {
+      method: "POST",
+      body: JSON.stringify({
+        username: body.username,
+        display_name: body.display_name ?? null,
+        email: body.email ?? null,
+        challenge_id: challenge.challenge_id,
+        encrypted_password,
+      }),
+    });
+  },
   logout: () => req<{ ok: boolean }>("/auth/logout", { method: "POST" }),
   me: () => req<User>("/auth/me"),
   updateProfile: (body: { display_name?: string | null; email?: string | null }) =>

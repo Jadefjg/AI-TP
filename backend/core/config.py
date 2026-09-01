@@ -58,6 +58,9 @@ class Settings(BaseSettings):
     bootstrap_admin_username: str = "admin"
     bootstrap_admin_password: str = "admin123456"
     bootstrap_admin_display_name: str = "Platform Admin"
+    # When true, reset bootstrap admin password on startup if it no longer matches env.
+    bootstrap_admin_sync_password: bool = False
+    auth_registration_enabled: bool = True
     job_worker_enabled: bool = True
     job_worker_in_api: bool = True
     job_queue_backend: str = "db"

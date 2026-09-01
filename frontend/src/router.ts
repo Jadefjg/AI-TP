@@ -3,6 +3,7 @@ import { authStore } from "./api/auth-store";
 import { formatRequiredPermissions, getRoutePermissionDenied } from "./router/permissions";
 import { usePlatformStore } from "./state/platform";
 import LoginPage from "./pages/LoginPage.vue";
+import RegisterPage from "./pages/RegisterPage.vue";
 import ShellLayout from "./layouts/ShellLayout.vue";
 
 const DashboardPage = () => import("./pages/DashboardPage.vue");
@@ -43,6 +44,12 @@ const router = createRouter({
       path: "/login",
       name: "login",
       component: LoginPage,
+      meta: { requiresAuth: false },
+    },
+    {
+      path: "/register",
+      name: "register",
+      component: RegisterPage,
       meta: { requiresAuth: false },
     },
     {
@@ -283,7 +290,7 @@ router.beforeEach(async (to) => {
   const token = authStore.getToken();
   const requiresAuth = to.matched.some((record) => record.meta.requiresAuth);
 
-  if (to.name === "login") {
+  if (to.name === "login" || to.name === "register") {
     if (!token) {
       return true;
     }
@@ -325,6 +332,22 @@ router.beforeEach(async (to) => {
   }
 
   return true;
+});
+
+const CHUNK_RELOAD_FLAG = "ai-tp:chunk-reload";
+
+router.onError((error, to) => {
+  const message = error instanceof Error ? error.message : String(error);
+  const isChunkLoadFailure =
+    /Failed to fetch dynamically imported module|Importing a module script failed|Loading chunk .* failed/i.test(
+      message,
+    );
+  if (!isChunkLoadFailure || sessionStorage.getItem(CHUNK_RELOAD_FLAG)) {
+    return;
+  }
+  sessionStorage.setItem(CHUNK_RELOAD_FLAG, "1");
+  const target = to.fullPath || window.location.pathname + window.location.search;
+  window.location.assign(target.startsWith("/") ? target : `/${target}`);
 });
 
 export default router;

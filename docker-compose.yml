@@ -2,7 +2,11 @@
 # Usage:
 #   cp deploy/.env.docker.example deploy/.env.docker
 #   # edit secrets (and optionally AI_TP_API_IMAGE / AI_TP_WEB_IMAGE for Hub)
-#   docker compose --env-file deploy/.env.docker up -d --build
+#   docker compose up -d --build
+#   # faster on CN networks:
+#   docker compose -f docker-compose.yml -f compose.local.yml up -d --build
+#   # full worker (Playwright/k6/nuclei, slow first build):
+#   docker compose -f docker-compose.yml -f compose.worker-tools.yml up -d --build
 # Push custom images (after docker login):
 #   ./deploy/scripts/push-images.sh YOURUSER
 
@@ -12,6 +16,8 @@ services:
   mysql:
     image: mysql:8.4
     restart: unless-stopped
+    env_file:
+      - deploy/.env.docker
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpass}
       MYSQL_DATABASE: ${MYSQL_DATABASE:-ai_tp}
@@ -51,13 +57,15 @@ services:
     env_file:
       - deploy/.env.docker
     environment:
-      DATABASE_URL: mysql+pymysql://${MYSQL_USER:-ai_tp}:${MYSQL_PASSWORD:-ai_tp_pass}@mysql:3306/${MYSQL_DATABASE:-ai_tp}?charset=utf8mb4
+      MYSQL_HOST: mysql
       REDIS_URL: redis://redis:6379/0
       JOB_QUEUE_BACKEND: ${JOB_QUEUE_BACKEND:-rq}
       JOB_WORKER_IN_API: "false"
       JOB_WORKER_ENABLED: "true"
       SCHEMA_BOOTSTRAP_MODE: alembic
       RUN_MIGRATIONS: "true"
+      BOOTSTRAP_ADMIN_SYNC_PASSWORD: ${BOOTSTRAP_ADMIN_SYNC_PASSWORD:-true}
+      AUTH_REGISTRATION_ENABLED: ${AUTH_REGISTRATION_ENABLED:-true}
       BACKEND_CORS_ORIGINS: ${BACKEND_CORS_ORIGINS:-http://localhost:8088,http://127.0.0.1:8088}
     volumes:
       - ai_tp_data:/app/data
@@ -76,25 +84,20 @@ services:
       - "8002"
 
   worker:
-    # Tools image (k6 / Playwright / nuclei). Slim fallback: set
-    # AI_TP_WORKER_IMAGE=$AI_TP_API_IMAGE and AI_TP_WORKER_TARGET=runtime
-    image: ${AI_TP_WORKER_IMAGE:-ai-tp-worker:local}
-    build:
-      context: .
-      dockerfile: deploy/Dockerfile
-      target: ${AI_TP_WORKER_TARGET:-worker-tools}
+    # Default: reuse api (runtime) image — fast local builds (~2–5 min).
+    # UI/perf/security tools run in worker-tools overlay when needed (see compose.worker-tools.yml).
+    image: ${AI_TP_WORKER_IMAGE:-ai-tp-api:local}
     restart: unless-stopped
     command: ["/entrypoint-worker.sh"]
     env_file:
       - deploy/.env.docker
     environment:
-      DATABASE_URL: mysql+pymysql://${MYSQL_USER:-ai_tp}:${MYSQL_PASSWORD:-ai_tp_pass}@mysql:3306/${MYSQL_DATABASE:-ai_tp}?charset=utf8mb4
+      MYSQL_HOST: mysql
       REDIS_URL: redis://redis:6379/0
       JOB_QUEUE_BACKEND: ${JOB_QUEUE_BACKEND:-rq}
       JOB_WORKER_IN_API: "false"
       JOB_WORKER_ENABLED: "true"
       SCHEMA_BOOTSTRAP_MODE: alembic
-      PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
     volumes:
       - ai_tp_data:/app/data
     depends_on:

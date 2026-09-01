@@ -7,7 +7,7 @@ import { usePlatformStore } from "../state/platform";
 const route = useRoute();
 const router = useRouter();
 const store = usePlatformStore();
-const loginForm = reactive({ username: "admin", password: "admin123456" });
+const loginForm = reactive({ username: "", password: "" });
 const loginError = ref("");
 
 const features = [
@@ -116,12 +116,25 @@ const submit = async () => {
               <p class="login-form__subtitle">验证身份以接入 AI 工作台与用户管理</p>
             </header>
 
-            <a-form layout="vertical" class="login-form__body" @submit="submit">
+            <a-form layout="vertical" class="login-form__body" autocomplete="off" @submit="submit">
               <a-form-item label="用户名" required>
-                <a-input v-model="loginForm.username" placeholder="admin" allow-clear size="large" />
+                <a-input
+                  v-model="loginForm.username"
+                  name="username"
+                  autocomplete="off"
+                  placeholder="请输入用户名"
+                  allow-clear
+                  size="large"
+                />
               </a-form-item>
               <a-form-item label="密码" required>
-                <a-input-password v-model="loginForm.password" placeholder="密码" size="large" />
+                <a-input-password
+                  v-model="loginForm.password"
+                  name="password"
+                  autocomplete="off"
+                  placeholder="请输入密码"
+                  size="large"
+                />
               </a-form-item>
               <a-alert v-if="loginError" type="error" class="login-error" :title="loginError" show-icon />
               <a-button
@@ -136,8 +149,9 @@ const submit = async () => {
               </a-button>
             </a-form>
 
-            <p class="login-footnote">
-              默认账号 <code>admin / admin123456</code> · 生产环境请尽快修改密码
+            <p class="login-register">
+              还没有账号？
+              <router-link to="/register" class="login-register__link">立即注册</router-link>
             </p>
           </section>
         </div>
@@ -567,21 +581,24 @@ const submit = async () => {
   font-size: 13px;
 }
 
-.login-footnote {
+.login-register {
   margin: 20px 0 0;
   padding-top: 16px;
   border-top: 1px solid rgba(148, 163, 184, 0.1);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.65;
-  color: rgba(100, 116, 139, 0.95);
+  color: rgba(148, 163, 184, 0.95);
   text-align: center;
 }
 
-.login-footnote code {
+.login-register__link {
   color: #67e8f9;
-  background: rgba(14, 165, 233, 0.1);
-  padding: 1px 6px;
-  border-radius: 4px;
+  text-decoration: none;
+  margin-left: 4px;
+}
+
+.login-register__link:hover {
+  text-decoration: underline;
 }
 
 @keyframes border-spin {

@@ -6,7 +6,7 @@
 #   ./deploy/scripts/aliyun-deploy.sh --prod       # + compose.prod.yml (no public MySQL/Redis)
 #   ./deploy/scripts/aliyun-deploy.sh --prod --small  # + compose.small.yml (2C/2G ECS)
 #   If compose.shared.yml exists, it is always layered (shared MySQL/Redis).
-#   ./deploy/scripts/aliyun-deploy.sh --pull       # pull images instead of --build
+#   ./deploy/scripts/aliyun-deploy.sh --worker-tools # + compose.worker-tools.yml (Playwright/k6)
 #
 # Prerequisites:
 #   - Docker Engine + Compose v2
@@ -20,12 +20,14 @@ cd "$ROOT"
 ENV_FILE="${ENV_FILE:-deploy/.env.docker}"
 PROD=false
 SMALL=false
+WORKER_TOOLS=false
 PULL=false
 
 for arg in "$@"; do
   case "$arg" in
     --prod) PROD=true ;;
     --small) SMALL=true ;;
+    --worker-tools) WORKER_TOOLS=true ;;
     --pull) PULL=true ;;
     -h|--help)
       sed -n '1,16p' "$0"
@@ -52,6 +54,10 @@ if $SMALL; then
   COMPOSE+=(-f compose.small.yml)
   echo "==> Small-ECS overlay: compose.small.yml (memory caps + CN package mirrors)"
 fi
+if $WORKER_TOOLS; then
+  COMPOSE+=(-f compose.worker-tools.yml)
+  echo "==> Worker-tools overlay: Playwright/k6/nuclei (slow first build)"
+fi
 if [[ -f compose.shared.yml ]]; then
   COMPOSE+=(-f compose.shared.yml)
   echo "==> Shared middleware overlay: compose.shared.yml (common MySQL/Redis)"
@@ -72,9 +78,14 @@ elif $SMALL; then
   "${COMPOSE[@]}" build web
   echo "==> Starting stack..."
   "${COMPOSE[@]}" up -d
-else
-  echo "==> Building and starting stack (first worker-tools build may take 15–30 min)..."
+elif $WORKER_TOOLS; then
+  echo "==> Building stack with worker-tools (first build may take 15–30 min)..."
   "${COMPOSE[@]}" up -d --build
+else
+  echo "==> Building api + web (slim worker reuses api image, typically 2–5 min)..."
+  "${COMPOSE[@]}" build api web
+  echo "==> Starting stack..."
+  "${COMPOSE[@]}" up -d
 fi
 
 echo "==> Waiting for API health (up to 120s)..."

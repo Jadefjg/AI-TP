@@ -627,6 +627,14 @@ class LoginIn(BaseModel):
     encrypted_password: str = Field(min_length=16, max_length=4096)
 
 
+class RegisterIn(BaseModel):
+    username: str = Field(min_length=3, max_length=64)
+    display_name: str | None = Field(default=None, max_length=255)
+    email: EmailStr | None = None
+    challenge_id: str = Field(min_length=8, max_length=128)
+    encrypted_password: str = Field(min_length=16, max_length=4096)
+
+
 class AuthTokenOut(BaseModel):
     access_token: str
     token_type: str = "bearer"
