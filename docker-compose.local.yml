@@ -2,16 +2,14 @@
 #
 # 首次：
 #   cp deploy/.env.docker.local.example deploy/.env.docker
-#   docker compose -f docker-compose.local.yml up -d --build
+#   docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
 #
 # 访问：http://127.0.0.1:8088/
 #
 # 与旧版 ai-tp-local 项目名不同：统一为 ai-tp，避免与已有栈抢 8088/3307/6380 端口。
 
-name: ai-tp
-
-include:
-  - docker-compose.yml
+# Overlay only — Compose 2.24+ cannot override services imported via include.
+# Use: docker compose -f docker-compose.yml -f docker-compose.local.yml ...
 
 services:
   api:

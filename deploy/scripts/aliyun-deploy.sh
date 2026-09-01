@@ -8,7 +8,7 @@
 #   ./deploy/scripts/aliyun-deploy.sh --pull          # pull 镜像而非 build
 #
 # Prerequisites:
-#   - Docker Engine + Compose v2.20+（支持 include）
+#   - Docker Engine + Compose v2.24+（overlay 使用 !reset）
 #   - deploy/.env.docker configured (copy from deploy/.env.docker.aliyun.example)
 
 set -euo pipefail
@@ -45,7 +45,7 @@ if [[ ! -f "$ENV_FILE" ]]; then
   exit 1
 fi
 
-COMPOSE=(docker compose -f docker-compose.aliyun.yml)
+COMPOSE=(docker compose -f docker-compose.yml -f docker-compose.aliyun.yml)
 if $WORKER_TOOLS; then
   COMPOSE+=(-f compose.worker-tools.yml)
   echo "==> Worker-tools overlay: Playwright/k6/nuclei (slow first build)"
@@ -93,5 +93,5 @@ echo ""
 echo "Deploy finished."
 echo "  Web:  http://127.0.0.1:${PORT}/"
 echo "  API:  http://127.0.0.1:${PORT}/api/"
-echo "  Logs: docker compose -f docker-compose.aliyun.yml --env-file ${ENV_FILE} logs -f api worker web"
+echo "  Logs: docker compose -f docker-compose.yml -f docker-compose.aliyun.yml --env-file ${ENV_FILE} logs -f api worker web"
 echo "  Open security group for TCP ${PORT}; change bootstrap admin password after first login."

@@ -1,5 +1,5 @@
 # 可选：接入公共 MySQL/Redis（/opt/shared-infra）
-#   docker compose -f docker-compose.aliyun.yml -f compose.shared.yml up -d
+#   docker compose -f docker-compose.yml -f docker-compose.aliyun.yml -f compose.shared.yml up -d
 
 services:
   mysql:

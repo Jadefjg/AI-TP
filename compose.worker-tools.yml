@@ -1,6 +1,6 @@
 # 可选：Playwright + k6 + nuclei Worker（首次构建约 15–30 分钟）
 #   docker compose -f docker-compose.local.yml -f compose.worker-tools.yml up -d --build
-#   docker compose -f docker-compose.aliyun.yml -f compose.worker-tools.yml up -d --build
+#   docker compose -f docker-compose.yml -f docker-compose.aliyun.yml -f compose.worker-tools.yml up -d --build
 
 services:
   worker:

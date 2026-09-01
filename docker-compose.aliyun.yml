@@ -1,16 +1,18 @@
-# AI-TP — 阿里云 ECS / 生产单实例
+# AI-TP — 阿里云 ECS / 生产单实例（叠加在 docker-compose.yml 上）
 #
 # 首次：
 #   cp deploy/.env.docker.aliyun.example deploy/.env.docker
-#   docker compose -f docker-compose.aliyun.yml up -d --build
+#   docker compose -f docker-compose.yml -f docker-compose.aliyun.yml \
+#     --env-file deploy/.env.docker up -d --build
 # 或：./deploy/scripts/aliyun-deploy.sh
 #
-# 需 Playwright/k6：docker compose -f docker-compose.aliyun.yml -f compose.worker-tools.yml up -d --build
-
-name: ai-tp
-
-include:
-  - docker-compose.yml
+# 共用 /opt/shared-infra 的 MySQL/Redis：
+#   ./deploy/scripts/aliyun-deploy.sh --shared
+# 需 Playwright/k6：
+#   ./deploy/scripts/aliyun-deploy.sh --worker-tools
+#
+# Compose 2.24+ 禁止在 include 文件里覆盖已导入的 service，因此本文件是纯 overlay，
+# 必须与 docker-compose.yml 一起用 -f，不要单独 -f docker-compose.aliyun.yml。
 
 services:
   mysql:
