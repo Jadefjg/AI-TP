@@ -6,8 +6,8 @@
 #     --env-file deploy/.env.docker up -d --build
 # 或：./deploy/scripts/aliyun-deploy.sh
 #
-# 共用 /opt/shared-infra 的 MySQL/Redis：
-#   ./deploy/scripts/aliyun-deploy.sh --shared
+# 默认复用 /opt/shared-infra（不要再起 MySQL/Redis）：
+#   ./deploy/scripts/aliyun-deploy.sh
 # 需 Playwright/k6：
 #   ./deploy/scripts/aliyun-deploy.sh --worker-tools
 #

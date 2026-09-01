@@ -32,7 +32,8 @@ if [[ ! -f "$ENV_FILE" ]]; then
   cp deploy/.env.docker.local.example "$ENV_FILE"
 fi
 
-COMPOSE=(docker compose -f docker-compose.local.yml --env-file "$ENV_FILE")
+export COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-ai-tp}"
+COMPOSE=(docker compose -p "$COMPOSE_PROJECT_NAME" -f docker-compose.yml -f docker-compose.local.yml --env-file "$ENV_FILE")
 
 echo "==> Checking Docker..."
 docker compose version >/dev/null
@@ -68,4 +69,4 @@ echo ""
 echo "Local deploy finished."
 echo "  Web:  http://127.0.0.1:${PORT}/"
 echo "  API:  http://127.0.0.1:${PORT}/api/"
-echo "  Logs: docker compose -f docker-compose.local.yml --env-file ${ENV_FILE} logs -f api worker web"
+echo "  Logs: docker compose -p ${COMPOSE_PROJECT_NAME} -f docker-compose.yml -f docker-compose.local.yml --env-file ${ENV_FILE} logs -f api worker web"

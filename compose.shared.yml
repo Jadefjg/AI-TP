@@ -1,4 +1,6 @@
-# 可选：接入公共 MySQL/Redis（/opt/shared-infra）
+# 接入公共 MySQL/Redis（/opt/shared-infra 的 shared-mysql / shared-redis）
+# 本 overlay 会停用 compose 内的 mysql/redis，避免再起一套中间件。
+#   ./deploy/scripts/aliyun-deploy.sh
 #   docker compose -f docker-compose.yml -f docker-compose.aliyun.yml -f compose.shared.yml up -d
 
 services:

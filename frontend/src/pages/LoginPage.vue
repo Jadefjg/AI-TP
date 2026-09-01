@@ -9,6 +9,7 @@ const router = useRouter();
 const store = usePlatformStore();
 const loginForm = reactive({ username: "", password: "" });
 const loginError = ref("");
+const registerSuccess = ref(false);
 
 const features = [
   { icon: "◈", label: "AI 模块", desc: "五大智能引擎统一调度" },
@@ -23,6 +24,7 @@ onMounted(() => {
     loginForm.username = username;
     loginForm.password = "";
   }
+  registerSuccess.value = route.query.registered === "1";
 });
 
 const submit = async () => {
@@ -136,6 +138,13 @@ const submit = async () => {
                   size="large"
                 />
               </a-form-item>
+              <a-alert
+                v-if="registerSuccess"
+                type="success"
+                class="login-success"
+                title="注册成功，请登录"
+                show-icon
+              />
               <a-alert v-if="loginError" type="error" class="login-error" :title="loginError" show-icon />
               <a-button
                 type="primary"
@@ -537,6 +546,7 @@ const submit = async () => {
   box-shadow: 0 0 0 1000px rgba(8, 15, 30, 0.85) inset;
 }
 
+.login-success,
 .login-error {
   margin-bottom: 14px;
 }

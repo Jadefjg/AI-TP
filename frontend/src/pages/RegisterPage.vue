@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import { authApi } from "../api/auth";
 import LoginBackground from "../components/LoginBackground.vue";
 import { usePlatformStore } from "../state/platform";
 
 const route = useRoute();
 const router = useRouter();
 const store = usePlatformStore();
+const submitting = ref(false);
 const registerForm = reactive({
   username: "",
   display_name: "",
@@ -36,20 +38,24 @@ const submit = async () => {
     return;
   }
 
-  store.loading.value = true;
+  submitting.value = true;
   try {
-    await store.register({
+    await authApi.register({
       username,
       password: registerForm.password,
       display_name: registerForm.display_name.trim() || null,
       email: registerForm.email.trim() || null,
     });
-    const redirect = typeof route.query.redirect === "string" ? route.query.redirect : "/dashboard";
-    await router.replace(redirect);
+    const loginQuery: Record<string, string> = { username, registered: "1" };
+    const redirect = typeof route.query.redirect === "string" ? route.query.redirect : "";
+    if (redirect) {
+      loginQuery.redirect = redirect;
+    }
+    await router.replace({ path: "/login", query: loginQuery });
   } catch (error) {
     registerError.value = error instanceof Error ? error.message : String(error);
   } finally {
-    store.loading.value = false;
+    submitting.value = false;
   }
 };
 </script>
@@ -89,10 +95,10 @@ const submit = async () => {
               html-type="submit"
               long
               size="large"
-              :loading="store.loading.value"
+              :loading="submitting"
               class="register-submit"
             >
-              {{ store.loading.value ? "注册中…" : "注册并登录" }}
+              {{ submitting ? "注册中…" : "注册" }}
             </a-button>
           </a-form>
 
