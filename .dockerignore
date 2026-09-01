@@ -27,7 +27,8 @@ frontend/.vite
 .env.*
 !.env.example
 !**/.env.example
-!deploy/.env.docker.example
+!deploy/.env.docker.local.example
+!deploy/.env.docker.aliyun.example
 data/**
 !data/.gitkeep
 *.db

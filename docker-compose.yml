@@ -1,12 +1,4 @@
-# AI-TP container stack (recommended production-like default)
-# Usage:
-#   cp deploy/.env.docker.example deploy/.env.docker
-#   # edit secrets (and optionally AI_TP_API_IMAGE / AI_TP_WEB_IMAGE for Hub)
-#   docker compose up -d --build
-#   # faster on CN networks:
-#   docker compose -f docker-compose.yml -f compose.local.yml up -d --build
-#   # full worker (Playwright/k6/nuclei, slow first build):
-#   docker compose -f docker-compose.yml -f compose.worker-tools.yml up -d --build
+# AI-TP base stack — use docker-compose.local.yml or docker-compose.aliyun.yml
 # Push custom images (after docker login):
 #   ./deploy/scripts/push-images.sh YOURUSER
 

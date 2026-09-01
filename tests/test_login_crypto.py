@@ -44,7 +44,7 @@ def test_login_challenge_is_single_use(client: TestClient):
     challenge = issue_login_challenge()
     encrypted = encrypt_login_password_for_tests(
         challenge.challenge_id,
-        "admin123456",
+        "admin123",
         challenge.public_key,
     )
     decrypt_login_password(challenge.challenge_id, encrypted)

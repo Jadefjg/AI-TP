@@ -41,7 +41,7 @@ export AI_TP_API_IMAGE AI_TP_WORKER_IMAGE AI_TP_WEB_IMAGE
 export AI_TP_WORKER_TARGET="${AI_TP_WORKER_TARGET:-worker-tools}"
 
 ENV_FILE="${ENV_FILE:-deploy/.env.docker}"
-COMPOSE=(docker compose)
+COMPOSE=(docker compose -f docker-compose.yml -f compose.worker-tools.yml)
 if [[ -f "$ENV_FILE" ]]; then
   COMPOSE+=(--env-file "$ENV_FILE")
 fi
@@ -64,5 +64,5 @@ docker push "${AI_TP_WEB_IMAGE}"
 
 echo "Done."
 echo "On another machine, set the same AI_TP_*_IMAGE in deploy/.env.docker, then:"
-echo "  docker compose --env-file deploy/.env.docker pull"
-echo "  docker compose --env-file deploy/.env.docker up -d"
+echo "  docker compose -f docker-compose.local.yml --env-file deploy/.env.docker pull"
+echo "  docker compose -f docker-compose.local.yml --env-file deploy/.env.docker up -d"

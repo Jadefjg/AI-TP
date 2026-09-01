@@ -17,7 +17,8 @@ Thumbs.db
 .env.*
 !.env.example
 !**/.env.example
-!deploy/.env.docker.example
+!deploy/.env.docker.local.example
+!deploy/.env.docker.aliyun.example
 deploy/.env.docker
 *.pem
 *.key

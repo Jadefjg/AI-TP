@@ -93,7 +93,7 @@ REDIS_URL=redis://127.0.0.1:6379/0
 # 安全
 BACKEND_CORS_ORIGINS=https://your-domain.com
 AI_CREDENTIALS_ENCRYPTION_KEY=请换成足够长的随机串
-# 首次启动后立刻改掉默认管理员密码（默认 admin / admin123456）
+# 首次启动后立刻改掉默认管理员密码（默认 admin / admin123）
 
 # 对外地址
 CI_WEBHOOK_PUBLIC_BASE_URL=https://api.your-domain.com
@@ -229,24 +229,26 @@ server {
 
 | 路径 | 作用 |
 |------|------|
-| `docker-compose.yml` | mysql / redis / api / worker / web |
-| `compose.prod.yml` | 生产叠加：不暴露 MySQL/Redis 端口、默认开启 metrics 鉴权 |
-| `deploy/Dockerfile` | API（`runtime`）+ Worker（`worker-tools`：k6 / Playwright / nuclei） |
-| `deploy/Dockerfile.web` | 多阶段构建前端 + Nginx |
-| `deploy/.env.docker.example` | 容器环境变量模板 |
-| `deploy/scripts/aliyun-deploy.sh` | ECS 一键 `up --build` / `--prod` |
+| `docker-compose.local.yml` | 本地一键部署 |
+| `docker-compose.aliyun.yml` | 阿里云 ECS 一键部署 |
+| `docker-compose.yml` | 基础栈 |
+| `deploy/Dockerfile` | API + Worker（`runtime` / `worker-tools`） |
+| `deploy/Dockerfile.web` | 前端 + Nginx |
+| `deploy/.env.docker.local.example` | 本地 env 模板 |
+| `deploy/.env.docker.aliyun.example` | 阿里云 env 模板 |
+| `deploy/scripts/local-deploy.sh` | 本地一键脚本 |
+| `deploy/scripts/aliyun-deploy.sh` | 阿里云一键脚本 |
 
-**快速启动（本机或云主机）：**
+**快速启动：**
 
 ```bash
-cp deploy/.env.docker.example deploy/.env.docker
-# 编辑密钥、LLM Key、域名相关 URL
+# 本地
+cp deploy/.env.docker.local.example deploy/.env.docker
+docker compose -f docker-compose.local.yml up -d --build
 
-docker compose --env-file deploy/.env.docker up -d --build
-
-# 生产（不映射 DB/Redis 到宿主机）
-docker compose -f docker-compose.yml -f compose.prod.yml \
-  --env-file deploy/.env.docker up -d --build
+# 阿里云 ECS
+cp deploy/.env.docker.aliyun.example deploy/.env.docker
+docker compose -f docker-compose.aliyun.yml up -d --build
 ```
 
 **阿里云 ECS** 完整步骤（安全组、镜像加速、HTTPS、备份）→ **[DEPLOYMENT.ALIYUN.md](./DEPLOYMENT.ALIYUN.md)**。  
@@ -257,7 +259,7 @@ docker compose -f docker-compose.yml -f compose.prod.yml \
 
 ## 7. 安全基线
 
-1. 默认账号 `admin` / `admin123456` **上线后立即修改**（或用环境变量覆盖 bootstrap 密码且仅首次生效策略需自查）。  
+1. 默认账号 `admin` / `admin123` **上线后立即修改**  
 2. 生产关闭调试热重载；API 只绑 `127.0.0.1`，对外只暴露 Nginx。  
 3. `BACKEND_CORS_ORIGINS` 收紧为真实前端域名。  
 4. `METRICS_AUTH_ENABLED=true`，避免指标裸奔。  
@@ -286,7 +288,7 @@ docker compose -f docker-compose.yml -f compose.prod.yml \
 |--------|------|------|
 | P0 | Docker Compose 场景 C 跑通（或 [阿里云 ECS](./DEPLOYMENT.ALIYUN.md)） | 可对外/对内访问 |
 | P0 | 改密、CORS、SMTP/LLM、备份 | 安全与可用性 |
-| P1 | `compose.prod.yml` + HTTPS（SLB/Caddy） | 生产加固 |
+| P1 | `docker-compose.aliyun.yml` + HTTPS（SLB/Caddy） | 生产加固 |
 | P1 | CI 推镜像至 Hub/ACR | 可重复发版 |
 | P2 | 多 Worker 副本、k6 分布式节点 | 扩容 |
 | P2 | 指标鉴权、审计导出、OIDC | 合规 |
@@ -309,5 +311,5 @@ docker compose -f docker-compose.yml -f compose.prod.yml \
 
 ## 11. 一句话决策
 
-**正式对外（推荐）：Docker Compose + `compose.prod.yml`（Web + API + Worker + MySQL + Redis/RQ），前置 HTTPS。**  
+**正式对外（推荐）：`docker-compose.aliyun.yml`（Web + API + Worker + MySQL + Redis/RQ），前置 HTTPS。**  
 无 Docker 时见 §5 单机 systemd 路径；阿里云见 [DEPLOYMENT.ALIYUN.md](./DEPLOYMENT.ALIYUN.md)。

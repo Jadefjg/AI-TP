@@ -33,17 +33,21 @@
 
 | 路径 | 作用 |
 |------|------|
-| `docker-compose.yml` | 一键编排 mysql / redis / api / worker / web（含可配置 `image:` 便于 Hub 推送） |
-| `deploy/Dockerfile` | 多阶段：`runtime`（API）+ `worker-tools`（k6 / Playwright / nuclei） |
-| `deploy/Dockerfile.worker-tools` | 兼容别名（推荐直接用 Dockerfile target） |
-| `deploy/Dockerfile.web` | Node 构建前端 + Nginx 托管 |
+| **`docker-compose.local.yml`** | **本地一键入口**（国内镜像加速） |
+| **`docker-compose.aliyun.yml`** | **阿里云 ECS 一键入口**（不暴露 DB、内存限制） |
+| `docker-compose.yml` | 基础栈（被上述入口 include） |
+| `compose.worker-tools.yml` | 可选：Playwright/k6/nuclei Worker |
+| `compose.shared.yml` | 可选：接入公共 MySQL/Redis |
+| `deploy/.env.docker.local.example` | 本地环境变量模板 |
+| `deploy/.env.docker.aliyun.example` | 阿里云环境变量模板 |
+| `deploy/scripts/local-deploy.sh` | 本地一键脚本 |
+| `deploy/scripts/aliyun-deploy.sh` | 阿里云一键脚本 |
+| `deploy/Dockerfile` | 多阶段：`runtime` + `worker-tools` |
+| `deploy/Dockerfile.web` | Node 构建前端 + Nginx |
 | `deploy/nginx/default.conf` | SPA + `/api` 反代 |
-| `deploy/scripts/entrypoint-*.sh` | 等待依赖、迁移、启动进程 |
-| `deploy/scripts/push-images.sh` | 构建并推送 api/web 镜像到 Docker Hub（等） |
-| `deploy/scripts/aliyun-deploy.sh` | ECS 一键 `up --build` / `--prod` / `--pull` |
-| `compose.local.yml` | 本地加速：国内 apt/npm 镜像 |
-| `compose.worker-tools.yml` | 完整 Worker（Playwright/k6/nuclei，构建慢） |
-| `.dockerignore` | 缩小构建上下文、避免打入 `.env`/venv |
+| `deploy/scripts/entrypoint-*.sh` | 等待依赖、迁移、启动 |
+| `deploy/scripts/push-images.sh` | 推送镜像到 Hub/ACR |
+| `.dockerignore` | 缩小构建上下文 |
 
 ---
 
@@ -56,24 +60,36 @@
 
 ### 3.2 配置
 
+**本地：**
+
 ```bash
-cd /path/to/ai-tp
-cp deploy/.env.docker.example deploy/.env.docker
-# 至少修改：MYSQL_*_PASSWORD、BOOTSTRAP_ADMIN_PASSWORD、AI_CREDENTIALS_ENCRYPTION_KEY
-# 建议配置：DEEPSEEK_API_KEY 或 OPENAI_API_KEY
+cp deploy/.env.docker.local.example deploy/.env.docker
+# 修改 MYSQL_* 密码、AI_CREDENTIALS_ENCRYPTION_KEY 等
+```
+
+**阿里云 ECS：**
+
+```bash
+cp deploy/.env.docker.aliyun.example deploy/.env.docker
+# 必改：MYSQL_*、BOOTSTRAP_ADMIN_PASSWORD、BACKEND_CORS_ORIGINS（公网 IP/域名）、LLM Key
 ```
 
 ### 3.3 构建并启动
 
+**本地（Mac / Linux）：**
+
 ```bash
-# 默认：瘦 worker 复用 api 镜像，首次约 2–5 分钟
-docker compose up -d --build
+docker compose -f docker-compose.local.yml up -d --build
+# 或
+./deploy/scripts/local-deploy.sh --build
+```
 
-# 国内网络加速（阿里云 apt / npmmirror npm）
-docker compose -f docker-compose.yml -f compose.local.yml up -d --build
+**阿里云 ECS：**
 
-# 需要 Worker 内跑 Playwright / k6 / nuclei 时再启用（首次约 15–30 分钟）
-docker compose -f docker-compose.yml -f compose.worker-tools.yml up -d --build
+```bash
+docker compose -f docker-compose.aliyun.yml up -d --build
+# 或
+./deploy/scripts/aliyun-deploy.sh
 ```
 
 ### 3.4 验证
@@ -90,25 +106,19 @@ docker compose --env-file deploy/.env.docker exec api curl -s http://127.0.0.1:8
 ```
 
 浏览器打开：**http://localhost:8088/**  
-默认管理员与登录页一致：`admin` / `admin123456`（由 `BOOTSTRAP_ADMIN_*` 在**首次建库**时写入）。若你改过示例密码，请用该密码登录，或重建数据卷。**登录后立刻改密。**
+默认管理员：`admin` / `admin123`（由 `BOOTSTRAP_ADMIN_*` 在**首次建库**时写入；`BOOTSTRAP_ADMIN_SYNC_PASSWORD=true` 时可与 env 同步）。
 
 ### 3.5 常用运维命令
 
 ```bash
-# 日志
-docker compose --env-file deploy/.env.docker logs -f api worker web
+# 日志（本地示例；阿里云将 -f 改为 docker-compose.aliyun.yml）
+docker compose -f docker-compose.local.yml --env-file deploy/.env.docker logs -f api worker web
 
-# 扩容 Worker
-docker compose --env-file deploy/.env.docker up -d --scale worker=2
+docker compose -f docker-compose.local.yml --env-file deploy/.env.docker exec api alembic upgrade head
 
-# 迁移（API 启动已自动 alembic；也可手动）
-docker compose --env-file deploy/.env.docker exec api alembic upgrade head
+docker compose -f docker-compose.local.yml --env-file deploy/.env.docker down
 
-# 停止并保留数据卷
-docker compose --env-file deploy/.env.docker down
-
-# 危险：清数据
-docker compose --env-file deploy/.env.docker down -v
+docker compose -f docker-compose.local.yml --env-file deploy/.env.docker down -v
 ```
 
 ---
@@ -150,41 +160,32 @@ docker compose --env-file deploy/.env.docker down -v
 | 层级 | 来源 | 说明 |
 |------|------|------|
 | Compose 插值 | `deploy/.env.docker` 中 `MYSQL_*`、`WEB_PUBLISH_PORT` | 给 compose 文件 `${VAR}` |
-| 容器运行时 | 同文件 `env_file` + `environment` 覆盖 | `DATABASE_URL`/`REDIS_URL` 由 compose 指向服务名 |
+| 容器运行时 | `deploy/.env.docker` + entrypoint 从 `MYSQL_*` 组装 `DATABASE_URL` |
 | 前端构建期 | `Dockerfile.web` `ARG VITE_API_BASE_URL` | **构建后不可靠改**；同域 `/api` 最省事 |
 
-**切勿**把 `deploy/.env.docker` 提交进 Git（已在 `.gitignore` 的 `.env*` 规则覆盖；示例文件 `deploy/.env.docker.example` 可提交）。
+**切勿**把 `deploy/.env.docker` 提交进 Git。示例见 `deploy/.env.docker.local.example` / `deploy/.env.docker.aliyun.example`。
 
 ---
 
 ## 6. 场景变体
 
-### 6.1 仅内网试用（减配）
-
-- 可将 `JOB_QUEUE_BACKEND=db`，仍建议保留独立 `worker` 服务  
-- 可去掉对外映射的 MySQL/Redis 端口（编辑 compose `ports`）
-
-### 6.2 生产 HTTPS / 收紧端口
+### 6.1 完整 Worker 工具链（Playwright / k6）
 
 ```bash
-# 不暴露 MySQL/Redis 到宿主机（需 Compose v2.24+）
-docker compose -f docker-compose.yml -f compose.prod.yml --env-file deploy/.env.docker up -d
+docker compose -f docker-compose.local.yml -f compose.worker-tools.yml up -d --build
+# 阿里云：docker compose -f docker-compose.aliyun.yml -f compose.worker-tools.yml up -d --build
 ```
 
-在宿主机或前置再挂一层 Caddy/Nginx/云 LB 做 443，反代到 `web:80`；或扩展 `web` 服务挂证书。
-
-### 6.3 需要本机执行器（k6 / Playwright）
-
-默认应用镜像**偏瘦**，未预装 k6/浏览器。选项：
-
-1. **扩展 Worker Dockerfile**：安装 k6、playwright 依赖（镜像变大）  
-2. **Sidecar / 独立 k6-worker 容器**：走现有 `/internal/k6` + `K6_WORKER_TOKEN`  
-3. 接受工具缺失时 Run 项为 `skipped`
-
-### 6.4 多副本 API
+### 6.2 接入公共 MySQL/Redis
 
 ```bash
-docker compose --env-file deploy/.env.docker up -d --scale api=2
+docker compose -f docker-compose.aliyun.yml -f compose.shared.yml up -d
+```
+
+### 6.3 多副本 API
+
+```bash
+docker compose -f docker-compose.aliyun.yml --env-file deploy/.env.docker up -d --scale api=2
 ```
 
 注意：需在 `web` 前加负载均衡，或改 Nginx `upstream`；迁移只应有一个实例执行（可用 `RUN_MIGRATIONS=false` 在副本上关闭）。
@@ -251,7 +252,7 @@ Docker Desktop 里名为 `ai-tp` 的条目是 **Compose 项目（一组容器）
 docker login
 
 # 2) 配置（把 youruser 换成 Hub 用户名）
-cp -n deploy/.env.docker.example deploy/.env.docker
+cp deploy/.env.docker.local.example deploy/.env.docker
 # 编辑 deploy/.env.docker：
 #   AI_TP_API_IMAGE=youruser/ai-tp-api:latest
 #   AI_TP_WEB_IMAGE=youruser/ai-tp-web:latest
@@ -277,8 +278,9 @@ docker push youruser/ai-tp-web:latest
 
 至少需要（**不要**把含真实密钥的 `.env.docker` 提交到公开 Git）：
 
+- `docker-compose.local.yml` 或 `docker-compose.aliyun.yml`
 - `docker-compose.yml`
-- `deploy/.env.docker`（由 example 复制并改好 `AI_TP_*_IMAGE` 与密钥）
+- `deploy/.env.docker`（由对应 example 复制）
 
 无需拷贝完整源码即可 `pull` + `up`（镜像已在 Hub）。若仍要用 `--build`，则需要完整仓库。
 
@@ -289,8 +291,8 @@ docker push youruser/ai-tp-web:latest
 docker login   # 同一 Hub 账号（私有仓库必须；公开仓库可省略）
 
 cd /path/to/ai-tp-deploy-bundle   # 含 compose 与 deploy/.env.docker
-docker compose --env-file deploy/.env.docker pull
-docker compose --env-file deploy/.env.docker up -d
+docker compose -f docker-compose.local.yml --env-file deploy/.env.docker pull
+docker compose -f docker-compose.local.yml --env-file deploy/.env.docker up -d
 # 不要加 --build，否则会要求本地有构建上下文
 ```
 
@@ -307,7 +309,7 @@ docker compose --env-file deploy/.env.docker up -d
 ## 11. 建议的后续工程化
 
 1. CI：`docker build` 推送 `ghcr.io/<org>/ai-tp-api` / `ai-tp-worker` / `ai-tp-web`  
-2. 生产叠加：`compose.prod.yml`（已提供：收紧 DB/Redis 端口、建议开启 metrics auth）  
+2. 生产：`docker-compose.aliyun.yml`（收紧 DB/Redis 端口、建议开启 metrics auth）  
 3. 备份 Cron：`mysqldump` + `ai_tp_data` 卷归档  
 
 Worker 默认复用 **api（runtime）镜像**，本地构建只编 api + web。需要 Playwright/k6/nuclei 时使用 `compose.worker-tools.yml`（工具缺失时任务仍 `skipped`）。 

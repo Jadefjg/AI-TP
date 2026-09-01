@@ -1,13 +1,21 @@
-# Overlay for 2 vCPU / ~2 GiB ECS (e.g. Aliyun entry-level).
-# Worker reuses api image — no worker-tools build on low-spec hosts.
+# AI-TP — 阿里云 ECS / 生产单实例
 #
-# Usage:
-#   docker compose -f docker-compose.yml -f compose.prod.yml -f compose.small.yml \
-#     --env-file deploy/.env.docker up -d --build
+# 首次：
+#   cp deploy/.env.docker.aliyun.example deploy/.env.docker
+#   docker compose -f docker-compose.aliyun.yml up -d --build
+# 或：./deploy/scripts/aliyun-deploy.sh
+#
+# 需 Playwright/k6：docker compose -f docker-compose.aliyun.yml -f compose.worker-tools.yml up -d --build
+
+name: ai-tp
+
+include:
+  - docker-compose.yml
 
 services:
   mysql:
     image: mysql:8.0
+    ports: !reset []
     command:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
@@ -19,6 +27,7 @@ services:
     mem_limit: 256m
 
   redis:
+    ports: !reset []
     mem_limit: 64m
 
   api:
@@ -27,9 +36,13 @@ services:
       args:
         DEBIAN_MIRROR: mirrors.aliyun.com
         PIP_INDEX_URL: https://mirrors.aliyun.com/pypi/simple/
+    environment:
+      METRICS_AUTH_ENABLED: ${METRICS_AUTH_ENABLED:-true}
 
   worker:
     mem_limit: 384m
+    environment:
+      METRICS_AUTH_ENABLED: ${METRICS_AUTH_ENABLED:-true}
 
   web:
     mem_limit: 64m

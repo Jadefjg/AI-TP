@@ -56,7 +56,7 @@ class Settings(BaseSettings):
     auth_token_ttl_hours: int = 24
     auth_login_challenge_ttl_sec: int = 300
     bootstrap_admin_username: str = "admin"
-    bootstrap_admin_password: str = "admin123456"
+    bootstrap_admin_password: str = "admin123"
     bootstrap_admin_display_name: str = "Platform Admin"
     # When true, reset bootstrap admin password on startup if it no longer matches env.
     bootstrap_admin_sync_password: bool = False

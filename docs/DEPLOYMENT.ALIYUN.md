@@ -56,7 +56,7 @@ Internet
 | 入 | TCP | 443 | 0.0.0.0/0 | HTTPS |
 | 入 | TCP | 8088 | 0.0.0.0/0 | **仅调试期**；生产改 80/443 后删除 |
 
-**切勿**对公网开放 `3306`（MySQL）、`6379`（Redis）。生产使用 `compose.prod.yml` 取消端口映射。
+**切勿**对公网开放 `3306`（MySQL）、`6379`（Redis）。`docker-compose.aliyun.yml` 已默认不映射 DB/Redis 端口。
 
 ### 2.3 （可选）域名与证书
 
@@ -138,7 +138,7 @@ git clone https://github.com/Jadefjg/AI-TP.git .
 ### 5.2 配置环境变量
 
 ```bash
-cp deploy/.env.docker.example deploy/.env.docker
+cp deploy/.env.docker.aliyun.example deploy/.env.docker
 chmod 600 deploy/.env.docker
 ```
 
@@ -173,17 +173,12 @@ METRICS_BEARER_TOKEN=<随机串>
 ### 5.3 生产 Compose 启动
 
 ```bash
-cd /opt/ai-tp
+cd /opt/ai-tp   # 或 /opt/AI-TP
 
-# 生产叠加：不暴露 MySQL/Redis 到宿主机
-docker compose \
-  -f docker-compose.yml \
-  -f compose.prod.yml \
-  --env-file deploy/.env.docker \
-  up -d --build
+docker compose -f docker-compose.aliyun.yml up -d --build
+# 或
+./deploy/scripts/aliyun-deploy.sh
 ```
-
-首次 `worker-tools` 镜像构建含 k6 / Playwright / nuclei，**耗时较长**，请保持 SSH 不断开或使用 `tmux`/`screen`。
 
 ### 5.4 一键脚本（可选）
 
@@ -191,7 +186,8 @@ docker compose \
 
 ```bash
 chmod +x deploy/scripts/aliyun-deploy.sh
-./deploy/scripts/aliyun-deploy.sh --prod
+./deploy/scripts/aliyun-deploy.sh
+# 需要 Playwright/k6：./deploy/scripts/aliyun-deploy.sh --worker-tools
 ```
 
 ---
@@ -202,8 +198,8 @@ chmod +x deploy/scripts/aliyun-deploy.sh
 
 ```text
 /opt/ai-tp-deploy/
+  docker-compose.aliyun.yml
   docker-compose.yml
-  compose.prod.yml          # 生产建议带上
   deploy/
     .env.docker
 ```
@@ -211,10 +207,8 @@ chmod +x deploy/scripts/aliyun-deploy.sh
 ```bash
 cd /opt/ai-tp-deploy
 docker login   # Hub 或 ACR
-docker compose -f docker-compose.yml -f compose.prod.yml \
-  --env-file deploy/.env.docker pull
-docker compose -f docker-compose.yml -f compose.prod.yml \
-  --env-file deploy/.env.docker up -d
+docker compose -f docker-compose.aliyun.yml --env-file deploy/.env.docker pull
+docker compose -f docker-compose.aliyun.yml --env-file deploy/.env.docker up -d
 ```
 
 `.env.docker` 中镜像名示例（ACR）：
@@ -264,7 +258,7 @@ tp.example.com {
 
 ```bash
 # 容器健康
-docker compose --env-file deploy/.env.docker ps
+docker compose -f docker-compose.aliyun.yml --env-file deploy/.env.docker ps
 
 # 前端
 curl -sI "http://<公网IP或域名>/" | head -3
@@ -274,10 +268,10 @@ curl -s "http://<公网IP或域名>/api/"
 # 期望：{"name":"AI 测试平台 API",...}
 
 # 迁移
-docker compose --env-file deploy/.env.docker exec api alembic current
+docker compose -f docker-compose.aliyun.yml --env-file deploy/.env.docker exec api alembic current
 
 # Worker 消费
-docker compose --env-file deploy/.env.docker logs --tail=20 worker
+docker compose -f docker-compose.aliyun.yml --env-file deploy/.env.docker logs --tail=20 worker
 ```
 
 浏览器：
@@ -295,14 +289,11 @@ docker compose --env-file deploy/.env.docker logs --tail=20 worker
 ```bash
 cd /opt/ai-tp   # 或部署目录
 
-docker compose -f docker-compose.yml -f compose.prod.yml \
-  --env-file deploy/.env.docker logs -f api worker
+docker compose -f docker-compose.aliyun.yml --env-file deploy/.env.docker logs -f api worker
 
-docker compose -f docker-compose.yml -f compose.prod.yml \
-  --env-file deploy/.env.docker up -d --scale worker=2
+docker compose -f docker-compose.aliyun.yml --env-file deploy/.env.docker up -d --scale worker=2
 
-docker compose -f docker-compose.yml -f compose.prod.yml \
-  --env-file deploy/.env.docker exec api alembic upgrade head
+docker compose -f docker-compose.aliyun.yml --env-file deploy/.env.docker exec api alembic upgrade head
 ```
 
 ### 9.2 开机自启
@@ -317,7 +308,7 @@ sudo systemctl enable docker
 
 ```bash
 # MySQL
-docker compose --env-file deploy/.env.docker exec mysql \
+docker compose -f docker-compose.aliyun.yml --env-file deploy/.env.docker exec mysql \
   mysqldump -u root -p"${MYSQL_ROOT_PASSWORD}" ai_tp > ai_tp_$(date +%F).sql
 
 # 业务文件卷（报告等）
@@ -331,8 +322,7 @@ docker run --rm -v ai-tp_ai_tp_data:/data -v $(pwd):/backup alpine \
 
 ```bash
 git pull   # 方式 A
-docker compose -f docker-compose.yml -f compose.prod.yml \
-  --env-file deploy/.env.docker up -d --build api worker web
+docker compose -f docker-compose.aliyun.yml --env-file deploy/.env.docker up -d --build api web
 ```
 
 方式 B：`pull` 新 tag 后 `up -d`（Worker 与 API 镜像需版本一致）。
@@ -358,7 +348,7 @@ docker compose -f docker-compose.yml -f compose.prod.yml \
 
 1. 安全组最小权限；SSH 限源 IP。
 2. 使用 RAM 子账号操作 OSS/ACR，勿在 ECS 长期存放主账号 AK。
-3. 生产关闭 MySQL/Redis 公网映射（`compose.prod.yml`）。
+3. 生产关闭 MySQL/Redis 公网映射（`docker-compose.aliyun.yml` 已内置）。
 4. 启用 `METRICS_AUTH_ENABLED`，勿将 `/metrics` 暴露给公网 crawlers。
 5. 定期快照 ECS 系统盘 + 数据库逻辑备份。
 
@@ -373,4 +363,4 @@ docker compose -f docker-compose.yml -f compose.prod.yml \
 | [DOCKER_HUB.md](./DOCKER_HUB.md) | 镜像推送与异地 pull |
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | 队列、Worker、k6 节点 |
 
-**一句话：** 阿里云 ECS 装 Docker → 配置 `deploy/.env.docker` → `compose.prod.yml up -d --build` → 安全组放通 80/443 → 验收 Run 与改密。
+**一句话：** 阿里云 ECS 装 Docker → `cp deploy/.env.docker.aliyun.example deploy/.env.docker` → `docker-compose.aliyun.yml up -d --build` → 安全组放通 80/443 → 验收并改密。

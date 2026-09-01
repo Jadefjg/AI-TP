@@ -29,7 +29,7 @@ def test_project_ai_list_routes_require_bearer_token(client: TestClient, admin_h
 
 
 def test_project_ai_list_routes_accept_valid_token(client: TestClient):
-    login = login_with_encrypted_password(client, username="admin", password="admin123456")
+    login = login_with_encrypted_password(client, username="admin", password="admin123")
     assert login.status_code == 200, login.text
     headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
     project_id = _create_project(client, headers)

@@ -7,7 +7,7 @@ from tests.auth_helpers import login_with_encrypted_password
 
 
 def test_change_password_returns_new_token(client: TestClient):
-    login = login_with_encrypted_password(client, username="admin", password="admin123456")
+    login = login_with_encrypted_password(client, username="admin", password="admin123")
     assert login.status_code == 200, login.text
     old_token = login.json()["access_token"]
     headers = {"Authorization": f"Bearer {old_token}"}
@@ -17,8 +17,8 @@ def test_change_password_returns_new_token(client: TestClient):
     payload = challenge.json()
     encrypted_payload = encrypt_change_password_for_tests(
         payload["challenge_id"],
-        "admin123456",
-        "admin1234567",
+        "admin123",
+        "admin1234",
         payload["public_key"],
     )
     changed = client.post(
@@ -42,8 +42,8 @@ def test_change_password_returns_new_token(client: TestClient):
     revert_payload = revert_challenge.json()
     revert_encrypted = encrypt_change_password_for_tests(
         revert_payload["challenge_id"],
-        "admin1234567",
-        "admin123456",
+        "admin1234",
+        "admin123",
         revert_payload["public_key"],
     )
     reverted = client.post(

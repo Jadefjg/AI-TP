@@ -15,7 +15,7 @@
 
 架构说明见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。  
 **生产部署**见 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)。  
-**容器化（推荐）**见 [docs/DEPLOYMENT.DOCKER.md](docs/DEPLOYMENT.DOCKER.md)（`docker compose up`）。  
+**容器化（推荐）**见 [docs/DEPLOYMENT.DOCKER.md](docs/DEPLOYMENT.DOCKER.md)（本地 `docker-compose.local.yml` / 阿里云 `docker-compose.aliyun.yml`）。  
 **阿里云 ECS**见 [docs/DEPLOYMENT.ALIYUN.md](docs/DEPLOYMENT.ALIYUN.md)。  
 **推送到 Docker Hub / 异地运行**见 [docs/DOCKER_HUB.md](docs/DOCKER_HUB.md)。
 

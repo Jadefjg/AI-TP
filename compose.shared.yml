@@ -1,7 +1,5 @@
-# 接入 /opt/shared-infra：停用本项目独立 MySQL/Redis，改连公共实例
-# 用法：
-#   docker compose -f docker-compose.yml -f compose.prod.yml -f compose.small.yml \
-#     -f compose.shared.yml --env-file deploy/.env.docker up -d --no-build
+# 可选：接入公共 MySQL/Redis（/opt/shared-infra）
+#   docker compose -f docker-compose.aliyun.yml -f compose.shared.yml up -d
 
 services:
   mysql:
