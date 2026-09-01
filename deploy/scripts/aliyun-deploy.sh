@@ -4,6 +4,8 @@
 # Usage:
 #   ./deploy/scripts/aliyun-deploy.sh              # dev-like: base compose only
 #   ./deploy/scripts/aliyun-deploy.sh --prod       # + compose.prod.yml (no public MySQL/Redis)
+#   ./deploy/scripts/aliyun-deploy.sh --prod --small  # + compose.small.yml (2C/2G ECS)
+#   If compose.shared.yml exists, it is always layered (shared MySQL/Redis).
 #   ./deploy/scripts/aliyun-deploy.sh --pull       # pull images instead of --build
 #
 # Prerequisites:
@@ -17,14 +19,16 @@ cd "$ROOT"
 
 ENV_FILE="${ENV_FILE:-deploy/.env.docker}"
 PROD=false
+SMALL=false
 PULL=false
 
 for arg in "$@"; do
   case "$arg" in
     --prod) PROD=true ;;
+    --small) SMALL=true ;;
     --pull) PULL=true ;;
     -h|--help)
-      sed -n '1,12p' "$0"
+      sed -n '1,16p' "$0"
       exit 0
       ;;
     *)
@@ -44,6 +48,14 @@ if $PROD; then
   COMPOSE+=(-f compose.prod.yml)
   echo "==> Production overlay: compose.prod.yml (MySQL/Redis not published to host)"
 fi
+if $SMALL; then
+  COMPOSE+=(-f compose.small.yml)
+  echo "==> Small-ECS overlay: compose.small.yml (memory caps + CN package mirrors)"
+fi
+if [[ -f compose.shared.yml ]]; then
+  COMPOSE+=(-f compose.shared.yml)
+  echo "==> Shared middleware overlay: compose.shared.yml (common MySQL/Redis)"
+fi
 COMPOSE+=(--env-file "$ENV_FILE")
 
 echo "==> Checking Docker..."
@@ -53,6 +65,12 @@ if $PULL; then
   echo "==> Pulling images..."
   "${COMPOSE[@]}" pull
   echo "==> Starting stack (pull mode)..."
+  "${COMPOSE[@]}" up -d
+elif $SMALL; then
+  echo "==> Sequential build for small ECS (api then web; slim worker reuses api image)..."
+  "${COMPOSE[@]}" build api
+  "${COMPOSE[@]}" build web
+  echo "==> Starting stack..."
   "${COMPOSE[@]}" up -d
 else
   echo "==> Building and starting stack (first worker-tools build may take 15–30 min)..."

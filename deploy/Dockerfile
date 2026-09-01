@@ -13,7 +13,19 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Optional Debian mirror, e.g. mirrors.aliyun.com (Aliyun ECS)
+ARG DEBIAN_MIRROR=
+RUN if [ -n "$DEBIAN_MIRROR" ]; then \
+      if [ -f /etc/apt/sources.list.d/debian.sources ]; then \
+        sed -i "s|deb.debian.org|${DEBIAN_MIRROR}|g; s|security.debian.org|${DEBIAN_MIRROR}|g" \
+          /etc/apt/sources.list.d/debian.sources; \
+      fi; \
+      if [ -f /etc/apt/sources.list ]; then \
+        sed -i "s|deb.debian.org|${DEBIAN_MIRROR}|g; s|security.debian.org|${DEBIAN_MIRROR}|g" \
+          /etc/apt/sources.list; \
+      fi; \
+    fi \
+    && apt-get update && apt-get install -y --no-install-recommends \
       curl \
       build-essential \
       default-libmysqlclient-dev \
@@ -26,7 +38,13 @@ COPY backend ./backend
 COPY alembic.ini ./
 COPY alembic ./alembic
 
-RUN pip install -e ".[mysql,redis,worker,observability]"
+# Optional: PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/ (Aliyun ECS)
+ARG PIP_INDEX_URL=
+RUN if [ -n "$PIP_INDEX_URL" ]; then \
+      pip install -e ".[mysql,redis,worker,observability]" -i "$PIP_INDEX_URL"; \
+    else \
+      pip install -e ".[mysql,redis,worker,observability]"; \
+    fi
 
 RUN mkdir -p /app/data /app/data/mail_outbox
 

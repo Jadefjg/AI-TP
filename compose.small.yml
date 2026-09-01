@@ -1,0 +1,44 @@
+# Overlay for 2 vCPU / ~2 GiB ECS (e.g. Aliyun entry-level).
+# Do not build worker-tools (Playwright/k6) on this spec — set in .env.docker:
+#   AI_TP_WORKER_IMAGE=ai-tp-api:local
+#   AI_TP_WORKER_TARGET=runtime
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f compose.prod.yml -f compose.small.yml \
+#     --env-file deploy/.env.docker up -d --build
+
+services:
+  mysql:
+    image: mysql:8.0
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --innodb-buffer-pool-size=96M
+      - --innodb-log-buffer-size=8M
+      - --performance-schema=OFF
+      - --max-connections=50
+      - --skip-mysqlx
+    mem_limit: 256m
+
+  redis:
+    mem_limit: 64m
+
+  api:
+    mem_limit: 384m
+    build:
+      args:
+        DEBIAN_MIRROR: mirrors.aliyun.com
+        PIP_INDEX_URL: https://mirrors.aliyun.com/pypi/simple/
+
+  worker:
+    mem_limit: 384m
+    build:
+      args:
+        DEBIAN_MIRROR: mirrors.aliyun.com
+        PIP_INDEX_URL: https://mirrors.aliyun.com/pypi/simple/
+
+  web:
+    mem_limit: 64m
+    build:
+      args:
+        NPM_CONFIG_REGISTRY: https://registry.npmmirror.com

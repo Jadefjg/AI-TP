@@ -1,0 +1,41 @@
+# 接入 /opt/shared-infra：停用本项目独立 MySQL/Redis，改连公共实例
+# 用法：
+#   docker compose -f docker-compose.yml -f compose.prod.yml -f compose.small.yml \
+#     -f compose.shared.yml --env-file deploy/.env.docker up -d --no-build
+
+services:
+  mysql:
+    profiles: ["isolated-middleware"]
+
+  redis:
+    profiles: ["isolated-middleware"]
+
+  api:
+    mem_limit: 320m
+    depends_on: !reset []
+    environment:
+      DATABASE_URL: mysql+pymysql://${MYSQL_USER:-ai_tp}:${MYSQL_PASSWORD}@shared-mysql:3306/${MYSQL_DATABASE:-ai_tp}?charset=utf8mb4
+      REDIS_URL: redis://shared-redis:6379/0
+    networks:
+      - default
+      - shared-infra
+
+  worker:
+    mem_limit: 256m
+    depends_on: !reset
+      api:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: mysql+pymysql://${MYSQL_USER:-ai_tp}:${MYSQL_PASSWORD}@shared-mysql:3306/${MYSQL_DATABASE:-ai_tp}?charset=utf8mb4
+      REDIS_URL: redis://shared-redis:6379/0
+    networks:
+      - default
+      - shared-infra
+
+  web:
+    mem_limit: 48m
+
+networks:
+  shared-infra:
+    external: true
+    name: shared-infra

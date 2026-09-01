@@ -4,7 +4,13 @@ FROM node:20-bookworm-slim AS build
 WORKDIR /web
 
 COPY frontend/package.json frontend/package-lock.json ./
-RUN npm ci
+# Optional: NPM_CONFIG_REGISTRY=https://registry.npmmirror.com (Aliyun ECS)
+ARG NPM_CONFIG_REGISTRY=
+RUN if [ -n "$NPM_CONFIG_REGISTRY" ]; then \
+      npm ci --registry="$NPM_CONFIG_REGISTRY"; \
+    else \
+      npm ci; \
+    fi
 
 COPY frontend/ ./
 
