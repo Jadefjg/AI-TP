@@ -12,7 +12,7 @@
 #   ./deploy/scripts/aliyun-deploy.sh --pull
 #
 # Prerequisites:
-#   - Docker Engine + Compose v2.24+（overlay 使用 !reset）
+#   - Docker Engine + Compose v2.24+（depends_on.required: false）
 #   - deploy/.env.docker configured (copy from deploy/.env.docker.aliyun.example)
 
 set -euo pipefail
@@ -22,7 +22,6 @@ cd "$ROOT"
 
 ENV_FILE="${ENV_FILE:-deploy/.env.docker}"
 WORKER_TOOLS=false
-# Default: share middleware so compose does not spawn a second MySQL/Redis.
 SHARED=true
 ISOLATED=false
 PULL=false
@@ -36,10 +35,10 @@ for arg in "$@"; do
     --build) BUILD=true ;;
     --pull) PULL=true ;;
     --prod|--small)
-      echo "Note: $arg is built into docker-compose.aliyun.yml; flag ignored." >&2
+      echo "Note: $arg is configured via deploy/.env.docker; flag ignored." >&2
       ;;
     -h|--help)
-      sed -n '1,20p' "$0"
+      sed -n '1,22p' "$0"
       exit 0
       ;;
     *)
@@ -74,16 +73,51 @@ fi
 
 export COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-ai-tp}"
 
-COMPOSE=(docker compose -p "$COMPOSE_PROJECT_NAME" -f docker-compose.yml -f docker-compose.aliyun.yml)
-if $WORKER_TOOLS; then
-  COMPOSE+=(-f compose.worker-tools.yml)
-  echo "==> Worker-tools overlay: Playwright/k6/nuclei (slow first build)"
-fi
 if $SHARED; then
-  COMPOSE+=(-f compose.shared.yml)
+  export COMPOSE_PROFILES="${COMPOSE_PROFILES:-shared-middleware}"
+  export MYSQL_HOST="${MYSQL_HOST:-shared-mysql}"
+  export REDIS_URL="${REDIS_URL:-redis://shared-redis:6379/0}"
+  export API_MEM_LIMIT="${API_MEM_LIMIT:-320m}"
+  export WORKER_MEM_LIMIT="${WORKER_MEM_LIMIT:-256m}"
+  export WEB_MEM_LIMIT="${WEB_MEM_LIMIT:-48m}"
   echo "==> Reusing shared-mysql / shared-redis (no extra DB containers)"
+else
+  export COMPOSE_PROFILES="${COMPOSE_PROFILES:-isolated-middleware}"
+  export MYSQL_HOST="${MYSQL_HOST:-mysql}"
+  export REDIS_URL="${REDIS_URL:-redis://redis:6379/0}"
+  export MYSQL_IMAGE="${MYSQL_IMAGE:-mysql:8.0}"
+  export MYSQL_INNODB_BUFFER_POOL_SIZE="${MYSQL_INNODB_BUFFER_POOL_SIZE:-96M}"
+  export MYSQL_INNODB_LOG_BUFFER_SIZE="${MYSQL_INNODB_LOG_BUFFER_SIZE:-8M}"
+  export MYSQL_PERFORMANCE_SCHEMA="${MYSQL_PERFORMANCE_SCHEMA:-OFF}"
+  export MYSQL_MAX_CONNECTIONS="${MYSQL_MAX_CONNECTIONS:-50}"
+  export MYSQL_MEM_LIMIT="${MYSQL_MEM_LIMIT:-256m}"
+  export REDIS_MEM_LIMIT="${REDIS_MEM_LIMIT:-64m}"
+  export API_MEM_LIMIT="${API_MEM_LIMIT:-384m}"
+  export WORKER_MEM_LIMIT="${WORKER_MEM_LIMIT:-384m}"
+  export WEB_MEM_LIMIT="${WEB_MEM_LIMIT:-64m}"
+  echo "==> In-stack MySQL/Redis (isolated-middleware profile)"
 fi
-COMPOSE+=(--env-file "$ENV_FILE")
+
+if $WORKER_TOOLS; then
+  export WORKER_DOCKER_TARGET="${WORKER_DOCKER_TARGET:-worker-tools}"
+  export AI_TP_WORKER_IMAGE="${AI_TP_WORKER_IMAGE:-ai-tp-worker:local}"
+  export PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/ms-playwright}"
+  echo "==> Worker-tools mode: Playwright/k6/nuclei (slow first build)"
+fi
+
+COMPOSE=(docker compose -p "$COMPOSE_PROJECT_NAME" -f docker-compose.yml --env-file "$ENV_FILE")
+
+connect_shared_network() {
+  local svc cid
+  for svc in api worker; do
+    cid="$("${COMPOSE[@]}" ps -q "$svc" 2>/dev/null || true)"
+    [[ -n "$cid" ]] || continue
+    if docker inspect -f '{{json .NetworkSettings.Networks}}' "$cid" | grep -q '"shared-infra"'; then
+      continue
+    fi
+    docker network connect shared-infra "$cid"
+  done
+}
 
 echo "==> Checking Docker..."
 docker compose version >/dev/null
@@ -94,7 +128,6 @@ if docker ps -a --format '{{.Names}}' | grep -q '^ai-tp-local-'; then
 fi
 
 if $SHARED; then
-  # Drop in-project MySQL/Redis if a previous isolated deploy created them.
   for name in ai-tp-mysql-1 ai-tp-redis-1; do
     if docker ps -a --format '{{.Names}}' | grep -qx "$name"; then
       echo "==> Removing leftover $name (middleware already provided by shared-infra)"
@@ -109,13 +142,22 @@ if $PULL; then
   echo "==> Starting stack (no recreate if already running)..."
   "${COMPOSE[@]}" up -d --remove-orphans --no-recreate
 elif $BUILD; then
-  echo "==> Building api + web (slim worker reuses api image)..."
-  "${COMPOSE[@]}" build api web
+  echo "==> Building api + web (slim worker reuses api image unless --worker-tools)..."
+  if $WORKER_TOOLS; then
+    "${COMPOSE[@]}" build api worker web
+  else
+    "${COMPOSE[@]}" build api web
+  fi
   echo "==> Starting stack..."
   "${COMPOSE[@]}" up -d --remove-orphans
 else
   echo "==> Starting stack (reuse images; do not recreate healthy containers)..."
   "${COMPOSE[@]}" up -d --remove-orphans --no-recreate
+fi
+
+if $SHARED; then
+  echo "==> Connecting api/worker to shared-infra network..."
+  connect_shared_network
 fi
 
 echo "==> Waiting for API health (up to 120s)..."
@@ -140,7 +182,7 @@ echo ""
 echo "Deploy finished (project=${COMPOSE_PROJECT_NAME})."
 echo "  Web:  http://127.0.0.1:${PORT}/"
 echo "  API:  http://127.0.0.1:${PORT}/api/"
-echo "  Logs: docker compose -p ${COMPOSE_PROJECT_NAME} -f docker-compose.yml -f docker-compose.aliyun.yml --env-file ${ENV_FILE} logs -f api worker web"
+echo "  Logs: docker compose -p ${COMPOSE_PROJECT_NAME} -f docker-compose.yml --env-file ${ENV_FILE} logs -f api worker web"
 echo "  Open security group for TCP ${PORT}; change bootstrap admin password after first login."
 echo "  Running AI-TP containers:"
 docker ps --filter "name=ai-tp-" --format '  {{.Names}}  {{.Status}}  {{.Ports}}'

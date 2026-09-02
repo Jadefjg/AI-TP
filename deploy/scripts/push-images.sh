@@ -38,16 +38,17 @@ if [[ -z "${AI_TP_WORKER_IMAGE:-}" ]]; then
 fi
 
 export AI_TP_API_IMAGE AI_TP_WORKER_IMAGE AI_TP_WEB_IMAGE
-export AI_TP_WORKER_TARGET="${AI_TP_WORKER_TARGET:-worker-tools}"
+export WORKER_DOCKER_TARGET="${WORKER_DOCKER_TARGET:-worker-tools}"
+export PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/ms-playwright}"
 
 ENV_FILE="${ENV_FILE:-deploy/.env.docker}"
-COMPOSE=(docker compose -f docker-compose.yml -f compose.worker-tools.yml)
+COMPOSE=(docker compose -f docker-compose.yml)
 if [[ -f "$ENV_FILE" ]]; then
   COMPOSE+=(--env-file "$ENV_FILE")
 fi
 
 echo "==> Building api image: ${AI_TP_API_IMAGE} (target=runtime)"
-echo "==> Building worker-tools image: ${AI_TP_WORKER_IMAGE} (target=${AI_TP_WORKER_TARGET})"
+echo "==> Building worker-tools image: ${AI_TP_WORKER_IMAGE} (target=${WORKER_DOCKER_TARGET})"
 echo "==> Building web image: ${AI_TP_WEB_IMAGE}"
 "${COMPOSE[@]}" build api worker web
 
@@ -64,5 +65,5 @@ docker push "${AI_TP_WEB_IMAGE}"
 
 echo "Done."
 echo "On another machine, set the same AI_TP_*_IMAGE in deploy/.env.docker, then:"
-echo "  docker compose -f docker-compose.local.yml --env-file deploy/.env.docker pull"
-echo "  docker compose -f docker-compose.local.yml --env-file deploy/.env.docker up -d"
+echo "  docker compose --env-file deploy/.env.docker pull"
+echo "  docker compose --env-file deploy/.env.docker up -d"

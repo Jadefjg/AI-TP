@@ -1,6 +1,6 @@
 # AI-TP：推送到 Docker Hub 并在其他电脑运行
 
-> 配套：[`docker-compose.local.yml`](../docker-compose.local.yml)、[`docker-compose.aliyun.yml`](../docker-compose.aliyun.yml)、[`deploy/scripts/push-images.sh`](../deploy/scripts/push-images.sh)  
+> 配套：[`docker-compose.yml`](../docker-compose.yml)、[`deploy/scripts/push-images.sh`](../deploy/scripts/push-images.sh)  
 > 完整容器部署见 [DEPLOYMENT.DOCKER.md](./DEPLOYMENT.DOCKER.md)
 
 ---
@@ -16,7 +16,7 @@ Docker Desktop 里名为 **`ai-tp`**（左侧有 `>`、ID/Image/Port 为 `-`）�
 | api / worker | 本仓库构建（同一镜像，worker 换启动命令） | **是** |
 | web | 本仓库构建 | **是** |
 
-正确做法：**推送自定义镜像** + 带走 `docker-compose.local.yml`（或 `docker-compose.aliyun.yml`）与 `deploy/.env.docker`。  
+正确做法：**推送自定义镜像** + 带走 `docker-compose.yml` 与 `deploy/.env.docker`。  
 数据卷（数据库、报告文件）**不会**随镜像上传，异地是新库。
 
 ```text

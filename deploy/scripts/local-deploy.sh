@@ -4,6 +4,7 @@
 # Usage:
 #   ./deploy/scripts/local-deploy.sh
 #   ./deploy/scripts/local-deploy.sh --build
+#   ./deploy/scripts/local-deploy.sh --worker-tools --build
 
 set -euo pipefail
 
@@ -12,12 +13,14 @@ cd "$ROOT"
 
 ENV_FILE="${ENV_FILE:-deploy/.env.docker}"
 BUILD=false
+WORKER_TOOLS=false
 
 for arg in "$@"; do
   case "$arg" in
     --build) BUILD=true ;;
+    --worker-tools) WORKER_TOOLS=true ;;
     -h|--help)
-      echo "Usage: $0 [--build]"
+      echo "Usage: $0 [--build] [--worker-tools]"
       exit 0
       ;;
     *)
@@ -33,20 +36,32 @@ if [[ ! -f "$ENV_FILE" ]]; then
 fi
 
 export COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-ai-tp}"
-COMPOSE=(docker compose -p "$COMPOSE_PROJECT_NAME" -f docker-compose.yml -f docker-compose.local.yml --env-file "$ENV_FILE")
+export COMPOSE_PROFILES="${COMPOSE_PROFILES:-isolated-middleware}"
+
+if $WORKER_TOOLS; then
+  export WORKER_DOCKER_TARGET="${WORKER_DOCKER_TARGET:-worker-tools}"
+  export AI_TP_WORKER_IMAGE="${AI_TP_WORKER_IMAGE:-ai-tp-worker:local}"
+  export PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/ms-playwright}"
+  echo "==> Worker-tools mode: Playwright/k6/nuclei (slow first build)"
+fi
+
+COMPOSE=(docker compose -p "$COMPOSE_PROJECT_NAME" -f docker-compose.yml --env-file "$ENV_FILE")
 
 echo "==> Checking Docker..."
 docker compose version >/dev/null
 
-# 清理旧项目名 ai-tp-local 留下的失败容器（与 ai-tp 抢端口）
 if docker ps -a --format '{{.Names}}' | grep -q '^ai-tp-local-'; then
   echo "==> Removing leftover ai-tp-local stack (port conflict with ai-tp)..."
   docker compose -p ai-tp-local down --remove-orphans 2>/dev/null || true
 fi
 
 if $BUILD; then
-  echo "==> Building api + web (slim worker reuses api image)..."
-  "${COMPOSE[@]}" build api web
+  echo "==> Building api + web (slim worker reuses api image unless --worker-tools)..."
+  if $WORKER_TOOLS; then
+    "${COMPOSE[@]}" build api worker web
+  else
+    "${COMPOSE[@]}" build api web
+  fi
 fi
 
 echo "==> Starting stack..."
@@ -69,4 +84,4 @@ echo ""
 echo "Local deploy finished."
 echo "  Web:  http://127.0.0.1:${PORT}/"
 echo "  API:  http://127.0.0.1:${PORT}/api/"
-echo "  Logs: docker compose -p ${COMPOSE_PROJECT_NAME} -f docker-compose.yml -f docker-compose.local.yml --env-file ${ENV_FILE} logs -f api worker web"
+echo "  Logs: docker compose -p ${COMPOSE_PROJECT_NAME} -f docker-compose.yml --env-file ${ENV_FILE} logs -f api worker web"

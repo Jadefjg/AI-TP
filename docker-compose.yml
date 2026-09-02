@@ -1,12 +1,26 @@
-# AI-TP base stack — use docker-compose.local.yml or docker-compose.aliyun.yml
-# Push custom images (after docker login):
-#   ./deploy/scripts/push-images.sh YOURUSER
+# AI-TP unified Docker Compose — local + Aliyun ECS
+#
+# Local:
+#   cp deploy/.env.docker.local.example deploy/.env.docker
+#   ./deploy/scripts/local-deploy.sh --build
+#
+# Aliyun (default reuses /opt/shared-infra):
+#   cp deploy/.env.docker.aliyun.example deploy/.env.docker
+#   ./deploy/scripts/aliyun-deploy.sh --build
+#
+# Profiles (via COMPOSE_PROFILES in deploy/.env.docker or deploy scripts):
+#   isolated-middleware — in-stack MySQL + Redis (local default)
+#   shared-middleware   — reuse shared-mysql / shared-redis (Aliyun default)
+#   worker-tools        — Playwright + k6 + nuclei worker image
+#
+# Push custom images: ./deploy/scripts/push-images.sh YOURUSER
 
 name: ai-tp
 
 services:
   mysql:
-    image: mysql:8.4
+    profiles: ["isolated-middleware"]
+    image: ${MYSQL_IMAGE:-mysql:8.4}
     restart: unless-stopped
     env_file:
       - deploy/.env.docker
@@ -15,6 +29,14 @@ services:
       MYSQL_DATABASE: ${MYSQL_DATABASE:-ai_tp}
       MYSQL_USER: ${MYSQL_USER:-ai_tp}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-ai_tp_pass}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --innodb-buffer-pool-size=${MYSQL_INNODB_BUFFER_POOL_SIZE:-128M}
+      - --innodb-log-buffer-size=${MYSQL_INNODB_LOG_BUFFER_SIZE:-16M}
+      - --performance-schema=${MYSQL_PERFORMANCE_SCHEMA:-ON}
+      - --max-connections=${MYSQL_MAX_CONNECTIONS:-100}
+      - --skip-mysqlx
     volumes:
       - ai_tp_mysql:/var/lib/mysql
     healthcheck:
@@ -23,9 +45,11 @@ services:
       timeout: 5s
       retries: 30
     ports:
-      - "${MYSQL_PUBLISH_PORT:-3307}:3306"
+      - "127.0.0.1:${MYSQL_PUBLISH_PORT:-3307}:3306"
+    mem_limit: ${MYSQL_MEM_LIMIT:-1g}
 
   redis:
+    profiles: ["isolated-middleware"]
     image: redis:7-alpine
     restart: unless-stopped
     command: ["redis-server", "--appendonly", "yes"]
@@ -37,7 +61,8 @@ services:
       timeout: 3s
       retries: 20
     ports:
-      - "${REDIS_PUBLISH_PORT:-6380}:6379"
+      - "127.0.0.1:${REDIS_PUBLISH_PORT:-6380}:6379"
+    mem_limit: ${REDIS_MEM_LIMIT:-256m}
 
   api:
     image: ${AI_TP_API_IMAGE:-ai-tp-api:local}
@@ -45,12 +70,15 @@ services:
       context: .
       dockerfile: deploy/Dockerfile
       target: runtime
+      args:
+        DEBIAN_MIRROR: ${DEBIAN_MIRROR:-mirrors.aliyun.com}
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://mirrors.aliyun.com/pypi/simple/}
     restart: unless-stopped
     env_file:
       - deploy/.env.docker
     environment:
-      MYSQL_HOST: mysql
-      REDIS_URL: redis://redis:6379/0
+      MYSQL_HOST: ${MYSQL_HOST:-mysql}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       JOB_QUEUE_BACKEND: ${JOB_QUEUE_BACKEND:-rq}
       JOB_WORKER_IN_API: "false"
       JOB_WORKER_ENABLED: "true"
@@ -59,13 +87,16 @@ services:
       BOOTSTRAP_ADMIN_SYNC_PASSWORD: ${BOOTSTRAP_ADMIN_SYNC_PASSWORD:-true}
       AUTH_REGISTRATION_ENABLED: ${AUTH_REGISTRATION_ENABLED:-true}
       BACKEND_CORS_ORIGINS: ${BACKEND_CORS_ORIGINS:-http://localhost:8088,http://127.0.0.1:8088}
+      METRICS_AUTH_ENABLED: ${METRICS_AUTH_ENABLED:-false}
     volumes:
       - ai_tp_data:/app/data
     depends_on:
       mysql:
         condition: service_healthy
+        required: false
       redis:
         condition: service_healthy
+        required: false
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8002/"]
       interval: 10s
@@ -74,31 +105,42 @@ services:
       start_period: 40s
     expose:
       - "8002"
+    mem_limit: ${API_MEM_LIMIT:-1g}
 
   worker:
-    # Default: reuse api (runtime) image — fast local builds (~2–5 min).
-    # UI/perf/security tools run in worker-tools overlay when needed (see compose.worker-tools.yml).
     image: ${AI_TP_WORKER_IMAGE:-ai-tp-api:local}
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile
+      target: ${WORKER_DOCKER_TARGET:-runtime}
+      args:
+        DEBIAN_MIRROR: ${DEBIAN_MIRROR:-mirrors.aliyun.com}
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://mirrors.aliyun.com/pypi/simple/}
     restart: unless-stopped
     command: ["/entrypoint-worker.sh"]
     env_file:
       - deploy/.env.docker
     environment:
-      MYSQL_HOST: mysql
-      REDIS_URL: redis://redis:6379/0
+      MYSQL_HOST: ${MYSQL_HOST:-mysql}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       JOB_QUEUE_BACKEND: ${JOB_QUEUE_BACKEND:-rq}
       JOB_WORKER_IN_API: "false"
       JOB_WORKER_ENABLED: "true"
       SCHEMA_BOOTSTRAP_MODE: alembic
+      METRICS_AUTH_ENABLED: ${METRICS_AUTH_ENABLED:-false}
+      PLAYWRIGHT_BROWSERS_PATH: ${PLAYWRIGHT_BROWSERS_PATH:-}
     volumes:
       - ai_tp_data:/app/data
     depends_on:
       mysql:
         condition: service_healthy
+        required: false
       redis:
         condition: service_healthy
+        required: false
       api:
         condition: service_healthy
+    mem_limit: ${WORKER_MEM_LIMIT:-1g}
 
   web:
     image: ${AI_TP_WEB_IMAGE:-ai-tp-web:local}
@@ -107,12 +149,14 @@ services:
       dockerfile: deploy/Dockerfile.web
       args:
         VITE_API_BASE_URL: /api
+        NPM_CONFIG_REGISTRY: ${NPM_CONFIG_REGISTRY:-https://registry.npmmirror.com}
     restart: unless-stopped
     depends_on:
       api:
         condition: service_healthy
     ports:
       - "${WEB_PUBLISH_PORT:-8088}:80"
+    mem_limit: ${WEB_MEM_LIMIT:-256m}
 
 volumes:
   ai_tp_mysql:
