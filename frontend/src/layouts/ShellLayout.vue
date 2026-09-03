@@ -4,6 +4,7 @@ import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { RouterView } from "vue-router";
 import { projectsApi } from "../api/projects";
+import AppBrandMark from "../components/AppBrandMark.vue";
 import UserSettingsModal from "../components/UserSettingsModal.vue";
 import {
   buildPipelineQuery,
@@ -351,10 +352,7 @@ onMounted(() => {
       @collapse="(v: boolean) => (collapsed = v)"
     >
       <div class="brand">
-        <div class="brand__mark" aria-hidden="true">
-          <span class="brand__ring" />
-          <span class="brand__orb" />
-        </div>
+        <AppBrandMark compact />
         <div v-if="!collapsed">
           <h1>AI-TP</h1>
           <p>AI 测试中枢</p>
@@ -609,29 +607,6 @@ onMounted(() => {
   flex-shrink: 0;
   padding: 18px 16px 14px;
   border-bottom: 1px solid rgba(56, 189, 248, 0.1);
-}
-
-.brand__mark {
-  position: relative;
-  width: 32px;
-  height: 32px;
-  flex-shrink: 0;
-}
-
-.brand__ring {
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  border: 1.5px solid rgba(34, 211, 238, 0.45);
-  animation: brand-spin 6s linear infinite;
-}
-
-.brand__orb {
-  position: absolute;
-  inset: 7px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #22d3ee, #0ea5e9);
-  box-shadow: 0 0 16px rgba(14, 165, 233, 0.55);
 }
 
 .brand h1 {
@@ -917,11 +892,5 @@ onMounted(() => {
   background: transparent;
   white-space: pre-wrap;
   word-break: break-word;
-}
-
-@keyframes brand-spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 </style>

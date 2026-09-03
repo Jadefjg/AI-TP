@@ -2,6 +2,7 @@
 import { onMounted, reactive, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { authApi } from "../api/auth";
+import AppBrandMark from "../components/AppBrandMark.vue";
 import LoginBackground from "../components/LoginBackground.vue";
 import { usePlatformStore } from "../state/platform";
 
@@ -64,6 +65,10 @@ const submit = async () => {
   <div class="register-page">
     <LoginBackground />
 
+    <div class="register-brand-float">
+      <AppBrandMark />
+    </div>
+
     <div class="register-shell">
       <div class="register-frame">
         <section class="register-card">
@@ -125,6 +130,13 @@ const submit = async () => {
   padding: 24px;
   overflow-x: hidden;
   overflow-y: auto;
+}
+
+.register-brand-float {
+  position: absolute;
+  top: 24px;
+  left: 24px;
+  z-index: 2;
 }
 
 .register-shell {

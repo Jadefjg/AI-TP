@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="AI-TP">
+  <defs>
+    <linearGradient id="g" x1="8" y1="8" x2="56" y2="56" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#22d3ee"/>
+      <stop offset="0.55" stop-color="#38bdf8"/>
+      <stop offset="1" stop-color="#6366f1"/>
+    </linearGradient>
+    <radialGradient id="core" cx="32" cy="32" r="14" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#e0f2fe"/>
+      <stop offset="0.45" stop-color="#22d3ee"/>
+      <stop offset="1" stop-color="#0369a1"/>
+    </radialGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="#06101f"/>
+  <path
+    d="M32 8.5 52.5 20.5v23L32 55.5 11.5 43.5v-23L32 8.5Z"
+    fill="none"
+    stroke="url(#g)"
+    stroke-width="2.4"
+    stroke-linejoin="round"
+  />
+  <circle cx="32" cy="32" r="9.5" fill="url(#core)"/>
+  <circle cx="32" cy="32" r="14.5" fill="none" stroke="#67e8f9" stroke-opacity="0.45" stroke-width="1.4"/>
+  <circle cx="32" cy="18.5" r="2.1" fill="#67e8f9"/>
+  <circle cx="44.2" cy="39" r="2.1" fill="#a5b4fc"/>
+  <circle cx="19.8" cy="39" r="2.1" fill="#38bdf8"/>
+  <path d="M32 20.6v8.2M41.5 37.4l-7.1-4.1M22.5 37.4l7.1-4.1" stroke="#e0f2fe" stroke-width="1.5" stroke-linecap="round"/>
+</svg>

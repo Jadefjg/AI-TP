@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import AppBrandMark from "../components/AppBrandMark.vue";
 import LoginBackground from "../components/LoginBackground.vue";
 import { usePlatformStore } from "../state/platform";
 
@@ -45,6 +46,10 @@ const submit = async () => {
 <template>
   <div class="login-page">
     <LoginBackground />
+
+    <div class="login-brand-float">
+      <AppBrandMark />
+    </div>
 
     <div class="login-shell">
       <div class="login-frame">
@@ -183,6 +188,13 @@ const submit = async () => {
   padding: 24px;
   overflow-x: hidden;
   overflow-y: auto;
+}
+
+.login-brand-float {
+  position: absolute;
+  top: 24px;
+  left: 24px;
+  z-index: 2;
 }
 
 .login-shell {
@@ -679,6 +691,11 @@ const submit = async () => {
 }
 
 @media (max-width: 860px) {
+  .login-brand-float {
+    top: 16px;
+    left: 16px;
+  }
+
   .login-panel {
     grid-template-columns: 1fr;
   }
