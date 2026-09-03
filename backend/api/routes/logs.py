@@ -17,6 +17,8 @@ router = APIRouter(prefix="/logs", tags=["logs"])
 @router.get("", response_model=list[AuditLogOut], dependencies=[Depends(require_permission("logs.read"))])
 def list_logs(
     module: str | None = Query(default=None),
+    action: str | None = Query(default=None),
+    level: str | None = Query(default=None),
     organization_id: int | None = Query(default=None),
     project_id: int | None = Query(default=None),
     limit: int = Query(default=100, ge=1, le=500),
@@ -26,6 +28,10 @@ def list_logs(
     query = db.query(AuditLog)
     if module:
         query = query.filter(AuditLog.module == module)
+    if action:
+        query = query.filter(AuditLog.action.contains(action))
+    if level:
+        query = query.filter(AuditLog.level == level)
     scoped_org = resolve_organization_id_for_user(user, organization_id)
     if not is_platform_user(user):
         query = query.filter(AuditLog.organization_id == scoped_org)

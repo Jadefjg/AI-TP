@@ -52,7 +52,22 @@ const navEntries: Array<NavLeaf | NavGroup> = [
     type: "group",
     key: "perf-ops",
     label: "运维管理",
-    children: [{ to: "/k6-workers", label: "k6 节点", permission: "worker.read" }],
+    children: [
+      {
+        to: "/ops/overview",
+        label: "运维总览",
+        permission: ["ops.read", "system.read"],
+      },
+      { to: "/ops/schedule", label: "定时任务", permission: "schedule.read" },
+      { to: "/ops/dictionaries", label: "数据字典", permission: "dict.read" },
+      {
+        to: "/ops/alerts",
+        label: "告警通道",
+        permission: ["ops.read", "settings.read"],
+      },
+      { to: "/ops/audit", label: "日志审计", permission: "logs.read" },
+      { to: "/k6-workers", label: "k6 节点", permission: "worker.read" },
+    ],
   },
   { type: "item", to: "/tenant", label: "租户管理", permission: "org.read" },
   {
@@ -158,7 +173,7 @@ watch(
   (path) => {
     const keysToOpen: string[] = ["ai-pipeline"];
     if (path.startsWith("/system-users")) keysToOpen.push("system-users");
-    if (path.startsWith("/k6-workers")) keysToOpen.push("perf-ops");
+    if (path.startsWith("/k6-workers") || path.startsWith("/ops")) keysToOpen.push("perf-ops");
     if (path === "/system" || path.startsWith("/system/") || path.startsWith("/logs")) {
       keysToOpen.push("system-info");
     }

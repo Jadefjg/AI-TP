@@ -637,3 +637,92 @@ class AiArtifact(Base):
     model_name: Mapped[str] = mapped_column(String(128), nullable=False)
     prompt_template_id: Mapped[int | None] = mapped_column(ForeignKey("prompt_templates.id"), default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class SettingRevision(Base):
+    """Immutable history for system_settings changes (rollback support)."""
+
+    __tablename__ = "setting_revisions"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    setting_key: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    old_value: Mapped[str | None] = mapped_column(Text, default=None)
+    new_value: Mapped[str | None] = mapped_column(Text, default=None)
+    description: Mapped[str | None] = mapped_column(Text, default=None)
+    change_type: Mapped[str] = mapped_column(String(32), nullable=False, default="upsert")
+    actor_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class Dictionary(Base):
+    __tablename__ = "dictionaries"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    code: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    name: Mapped[str] = mapped_column(String(128), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, default=None)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+
+    items: Mapped[list[DictionaryItem]] = relationship(back_populates="dictionary", cascade="all, delete-orphan")
+
+
+class DictionaryItem(Base):
+    __tablename__ = "dictionary_items"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    dictionary_id: Mapped[int] = mapped_column(ForeignKey("dictionaries.id"), nullable=False, index=True)
+    item_key: Mapped[str] = mapped_column(String(64), nullable=False)
+    item_label: Mapped[str] = mapped_column(String(128), nullable=False)
+    item_value: Mapped[str] = mapped_column(String(512), nullable=False, default="")
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+    dictionary: Mapped[Dictionary] = relationship(back_populates="items")
+
+
+class ScheduledJob(Base):
+    """Whitelist-only ops jobs (no arbitrary shell/SQL)."""
+
+    __tablename__ = "scheduled_jobs"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
+    handler_key: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    description: Mapped[str | None] = mapped_column(Text, default=None)
+    interval_seconds: Mapped[int] = mapped_column(Integer, nullable=False, default=3600)
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    params: Mapped[dict | None] = mapped_column(JSON, default=None)
+    last_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    next_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    last_status: Mapped[str | None] = mapped_column(String(32), default=None)
+    last_error: Mapped[str | None] = mapped_column(Text, default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+
+    runs: Mapped[list[ScheduledJobRun]] = relationship(back_populates="job", cascade="all, delete-orphan")
+
+
+class ScheduledJobRun(Base):
+    __tablename__ = "scheduled_job_runs"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    job_id: Mapped[int] = mapped_column(ForeignKey("scheduled_jobs.id"), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="running")
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    duration_ms: Mapped[int | None] = mapped_column(Integer, default=None)
+    result: Mapped[dict | None] = mapped_column(JSON, default=None)
+    error: Mapped[str | None] = mapped_column(Text, default=None)
+    trigger: Mapped[str] = mapped_column(String(32), nullable=False, default="schedule")
+
+    job: Mapped[ScheduledJob] = relationship(back_populates="runs")

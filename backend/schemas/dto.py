@@ -602,6 +602,95 @@ class SystemSettingOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class SettingRevisionOut(BaseModel):
+    id: int
+    setting_key: str
+    old_value: str | None
+    new_value: str | None
+    description: str | None
+    change_type: str
+    actor_user_id: int | None
+    created_at: datetime
+    model_config = {"from_attributes": True}
+
+
+class DictionaryItemOut(BaseModel):
+    id: int
+    dictionary_id: int
+    item_key: str
+    item_label: str
+    item_value: str
+    sort_order: int
+    is_active: bool
+    model_config = {"from_attributes": True}
+
+
+class DictionaryOut(BaseModel):
+    id: int
+    code: str
+    name: str
+    description: str | None
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+    items: list[DictionaryItemOut] = []
+    model_config = {"from_attributes": True}
+
+
+class DictionaryCreate(BaseModel):
+    code: str = Field(min_length=1, max_length=64)
+    name: str = Field(min_length=1, max_length=128)
+    description: str | None = None
+    is_active: bool = True
+
+
+class DictionaryItemCreate(BaseModel):
+    item_key: str = Field(min_length=1, max_length=64)
+    item_label: str = Field(min_length=1, max_length=128)
+    item_value: str = ""
+    sort_order: int = 0
+    is_active: bool = True
+
+
+class ScheduledJobOut(BaseModel):
+    id: int
+    name: str
+    handler_key: str
+    description: str | None
+    interval_seconds: int
+    enabled: bool
+    params: dict | None
+    last_run_at: datetime | None
+    next_run_at: datetime | None
+    last_status: str | None
+    last_error: str | None
+    created_at: datetime
+    updated_at: datetime
+    model_config = {"from_attributes": True}
+
+
+class ScheduledJobCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=128)
+    handler_key: str = Field(min_length=1, max_length=64)
+    description: str | None = None
+    interval_seconds: int = Field(default=3600, ge=60, le=2_592_000)
+    enabled: bool = True
+    params: dict | None = None
+
+
+class ScheduledJobRunOut(BaseModel):
+    id: int
+    job_id: int
+    status: str
+    started_at: datetime
+    finished_at: datetime | None
+    duration_ms: int | None
+    result: dict | None
+    error: str | None
+    trigger: str
+    model_config = {"from_attributes": True}
+
+
 class SystemOverviewOut(BaseModel):
     api_name: str
     api_version: str

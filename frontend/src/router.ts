@@ -35,6 +35,12 @@ const LogsPage = () => import("./pages/LogsPage.vue");
 const SettingsPage = () => import("./pages/SettingsPage.vue");
 const AiPromptsPage = () => import("./pages/AiPromptsPage.vue");
 const K6WorkersPage = () => import("./pages/K6WorkersPage.vue");
+const OpsLayout = () => import("./pages/ops/OpsLayout.vue");
+const OpsOverviewPage = () => import("./pages/ops/OpsOverviewPage.vue");
+const OpsSchedulePage = () => import("./pages/ops/OpsSchedulePage.vue");
+const OpsDictionariesPage = () => import("./pages/ops/OpsDictionariesPage.vue");
+const OpsAlertsPage = () => import("./pages/ops/OpsAlertsPage.vue");
+const OpsAuditPage = () => import("./pages/ops/OpsAuditPage.vue");
 const ForbiddenPage = () => import("./pages/ForbiddenPage.vue");
 
 const router = createRouter({
@@ -267,6 +273,57 @@ const router = createRouter({
           name: "ai-prompts",
           component: AiPromptsPage,
           meta: { requiresAuth: true, permission: "prompt.read" },
+        },
+        {
+          path: "ops",
+          name: "ops",
+          component: OpsLayout,
+          meta: {
+            requiresAuth: true,
+            permissions: ["ops.read", "schedule.read", "dict.read", "logs.read", "worker.read", "system.read", "settings.read"],
+          },
+          children: [
+            {
+              path: "",
+              redirect: { name: "ops-overview" },
+            },
+            {
+              path: "overview",
+              name: "ops-overview",
+              component: OpsOverviewPage,
+              meta: {
+                requiresAuth: true,
+                permissions: ["ops.read", "system.read"],
+              },
+            },
+            {
+              path: "schedule",
+              name: "ops-schedule",
+              component: OpsSchedulePage,
+              meta: { requiresAuth: true, permission: "schedule.read" },
+            },
+            {
+              path: "dictionaries",
+              name: "ops-dictionaries",
+              component: OpsDictionariesPage,
+              meta: { requiresAuth: true, permission: "dict.read" },
+            },
+            {
+              path: "alerts",
+              name: "ops-alerts",
+              component: OpsAlertsPage,
+              meta: {
+                requiresAuth: true,
+                permissions: ["ops.read", "settings.read"],
+              },
+            },
+            {
+              path: "audit",
+              name: "ops-audit",
+              component: OpsAuditPage,
+              meta: { requiresAuth: true, permission: "logs.read" },
+            },
+          ],
         },
         {
           path: "k6-workers",

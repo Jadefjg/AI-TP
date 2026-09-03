@@ -32,8 +32,17 @@ export const adminApi = {
     from_addr?: string;
     dry_run?: boolean;
   }) => req<SmtpSettings>("/settings/smtp", { method: "PUT", body: JSON.stringify(body) }),
-  listLogs: (module?: string) =>
-    req<AuditLog[]>(module ? `/logs?module=${encodeURIComponent(module)}` : "/logs"),
+  listLogs: (filters?: { module?: string; action?: string; level?: string; limit?: number }) => {
+    const params = new URLSearchParams();
+    if (filters?.module) params.set("module", filters.module);
+    if (filters?.action) params.set("action", filters.action);
+    if (filters?.level) params.set("level", filters.level);
+    if (filters?.limit) params.set("limit", String(filters.limit));
+    const q = params.toString();
+    return req<AuditLog[]>(`/logs${q ? `?${q}` : ""}`);
+  },
+  purgeLogs: (days: number) =>
+    req<{ deleted: number }>(`/logs/retention/purge?days=${days}`, { method: "POST" }),
   listAiModules: () => req<string[]>("/ai/modules"),
   listPromptTemplates: (moduleType?: string, activeOnly = false) => {
     const params = new URLSearchParams();

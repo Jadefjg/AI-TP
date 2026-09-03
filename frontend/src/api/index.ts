@@ -18,6 +18,7 @@ export { projectsApi } from "./projects";
 export { casesApi } from "./cases";
 export { rbacApi } from "./rbac";
 export { adminApi } from "./admin";
+export { opsApi } from "./ops";
 export { aiApi, workbenchApi, integrationsApi } from "./ai";
 export { uiAutomationApi, previewUiScriptLocally } from "./uiAutomation";
 export { organizationsApi } from "./organizations";
@@ -31,6 +32,7 @@ export const api = {
   ...runsApi,
   ...rbacApi,
   ...adminApi,
+  ...opsApi,
   ...aiApi,
   ...workbenchApi,
   ...integrationsApi,

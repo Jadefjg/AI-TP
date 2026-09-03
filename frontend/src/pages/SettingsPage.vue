@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { Message } from "@arco-design/web-vue";
+import { Message, Modal } from "@arco-design/web-vue";
 import { onMounted, reactive, ref } from "vue";
 import { adminApi, type SmtpSettings } from "../api/admin";
+import { opsApi, type SettingRevision } from "../api/ops";
 import AiWorkspaceHero from "../components/ai/AiWorkspaceHero.vue";
 import { listTablePagination } from "../constants/listPagination";
 import { usePlatformStore } from "../state/platform";
@@ -9,6 +10,7 @@ import type { SystemSetting } from "../types";
 
 const store = usePlatformStore();
 const settings = ref<SystemSetting[]>([]);
+const revisions = ref<SettingRevision[]>([]);
 const settingForm = reactive({ key: "", value: "", description: "" });
 const smtp = ref<SmtpSettings | null>(null);
 const smtpForm = reactive({
@@ -32,6 +34,16 @@ const columns = [
   { title: "Key", dataIndex: "key", width: 180 },
   { title: "Value", dataIndex: "value", ellipsis: true },
   { title: "描述", dataIndex: "description", ellipsis: true },
+  { title: "操作", slotName: "actions", width: 160 },
+];
+
+const revisionColumns = [
+  { title: "ID", dataIndex: "id", width: 70 },
+  { title: "Key", dataIndex: "setting_key", width: 140 },
+  { title: "类型", dataIndex: "change_type", width: 100 },
+  { title: "旧值", dataIndex: "old_value", ellipsis: true },
+  { title: "新值", dataIndex: "new_value", ellipsis: true },
+  { title: "时间", dataIndex: "created_at", width: 180 },
   { title: "操作", slotName: "actions", width: 100 },
 ];
 
@@ -55,11 +67,17 @@ const loadSmtp = async () => {
   applySmtpToForm(data);
 };
 
+const loadRevisions = async (key?: string) => {
+  if (!store.hasPermission("settings.read")) return;
+  revisions.value = await opsApi.listSettingRevisions(key);
+};
+
 const load = () =>
   store.wrap(async () => {
     settings.value = await adminApi.listSettings();
     await loadSmtp();
-    store.setOut({ settings: settings.value, smtp: smtp.value });
+    await loadRevisions();
+    store.setOut({ settings: settings.value, smtp: smtp.value, revisions: revisions.value });
   });
 
 const upsert = () => {
@@ -67,16 +85,21 @@ const upsert = () => {
     Message.warning("请填写配置 Key");
     return;
   }
-  void store.wrap(async () => {
-    const result = await adminApi.upsertSetting({
-      key: settingForm.key.trim(),
-      value: settingForm.value,
-      description: settingForm.description || null,
-    });
-    store.setOut(result);
-    resetSettingForm();
-    await load();
-    Message.success("配置已保存");
+  Modal.confirm({
+    title: "确认保存配置？",
+    content: `将修改「${settingForm.key.trim()}」，变更会写入修订历史并可回滚。`,
+    onOk: () =>
+      store.wrap(async () => {
+        const result = await adminApi.upsertSetting({
+          key: settingForm.key.trim(),
+          value: settingForm.value,
+          description: settingForm.description || null,
+        });
+        store.setOut(result);
+        resetSettingForm();
+        await load();
+        Message.success("配置已保存");
+      }),
   });
 };
 
@@ -86,6 +109,27 @@ const remove = (key: string) =>
     store.setOut(result);
     await load();
   });
+
+const fillForm = (row: SystemSetting) => {
+  settingForm.key = row.key;
+  settingForm.value = row.value;
+  settingForm.description = row.description || "";
+  void loadRevisions(row.key);
+};
+
+const rollback = (rev: SettingRevision) => {
+  if (!store.hasPermission("settings.write")) return;
+  Modal.confirm({
+    title: "确认回滚到该修订？",
+    content: `将把「${rev.setting_key}」恢复为旧值（或删除），并再次记入审计。`,
+    onOk: () =>
+      store.wrap(async () => {
+        await opsApi.rollbackSetting(rev.id);
+        Message.success("已回滚");
+        await load();
+      }),
+  });
+};
 
 const fillQqPreset = () => {
   smtpForm.host = "smtp.qq.com";
@@ -154,7 +198,7 @@ onMounted(() => {
   <div class="ai-workspace ai-page-fill">
     <AiWorkspaceHero
       title="平台配置"
-      subtitle="系统配置 · 邮件 SMTP、平台开关与运行参数"
+      subtitle="系统配置 · 邮件 SMTP、平台开关与运行参数（变更留痕可回滚）"
       badge="AI · SETTINGS"
       status-label="配置域就绪"
       status-tone="online"
@@ -243,16 +287,34 @@ onMounted(() => {
       </a-form>
     </a-card>
 
-    <a-card title="配置列表" class="ai-panel ai-fill-panel">
+    <a-card title="配置列表" class="ai-panel" style="margin-bottom: 16px">
       <a-table :data="settings" :columns="columns" row-key="id" :pagination="tablePagination">
         <template #actions="{ record }">
-          <a-popconfirm
+          <a-space>
+            <a-button size="mini" @click="fillForm(record)">编辑</a-button>
+            <a-popconfirm
+              v-if="store.hasPermission('settings.write')"
+              content="确认删除？"
+              @ok="remove(record.key)"
+            >
+              <a-button size="mini" status="danger">删除</a-button>
+            </a-popconfirm>
+          </a-space>
+        </template>
+      </a-table>
+    </a-card>
+
+    <a-card title="配置修订历史（可回滚）" class="ai-panel ai-fill-panel">
+      <a-table :data="revisions" :columns="revisionColumns" row-key="id" :pagination="tablePagination">
+        <template #actions="{ record }">
+          <a-button
             v-if="store.hasPermission('settings.write')"
-            content="确认删除？"
-            @ok="remove(record.key)"
+            size="mini"
+            status="warning"
+            @click="rollback(record)"
           >
-            <a-button size="mini" status="danger">删除</a-button>
-          </a-popconfirm>
+            回滚
+          </a-button>
         </template>
       </a-table>
     </a-card>

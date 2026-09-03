@@ -32,6 +32,9 @@ export const MODULE_LABELS: Record<string, string> = {
   system: "系统信息",
   workbench: "AI 工作台",
   integration: "CI 集成",
+  ops: "运维管理",
+  dict: "数据字典",
+  schedule: "定时任务",
 };
 
 export const ROLE_TAG_COLORS = ["arcoblue", "purple", "pinkpurple", "orange", "green", "cyan"] as const;

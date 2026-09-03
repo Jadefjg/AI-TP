@@ -21,6 +21,7 @@ from backend.api.routes import (
     billing,
     organization_members,
     organizations,
+    ops,
     projects,
     rbac,
     reports,
@@ -80,6 +81,7 @@ app.include_router(dashboard.router)
 app.include_router(rbac.router)
 app.include_router(logs.router)
 app.include_router(settings_routes.router)
+app.include_router(ops.router)
 app.include_router(system.router)
 app.include_router(workers.router)
 app.include_router(internal_worker.router)
@@ -115,6 +117,20 @@ def _startup() -> None:
             )
         else:
             start_job_worker()
+    try:
+        from backend.services.dictionary_service import seed_builtin_dictionaries
+        from backend.services.scheduled_job_service import seed_default_scheduled_jobs, start_ops_scheduler
+        from backend.db.session import SessionLocal
+
+        seed_db = SessionLocal()
+        try:
+            seed_builtin_dictionaries(seed_db)
+            seed_default_scheduled_jobs(seed_db)
+        finally:
+            seed_db.close()
+        start_ops_scheduler()
+    except Exception:  # noqa: BLE001
+        logger.exception("ops scheduler/dictionary seed failed")
 
 
 @app.get("/")
