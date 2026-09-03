@@ -50,6 +50,13 @@ COMPOSE=(docker compose -p "$COMPOSE_PROJECT_NAME" -f docker-compose.yml --env-f
 echo "==> Checking Docker..."
 docker compose version >/dev/null
 
+# docker-compose.yml always joins external shared-infra (Aliyun shared DB).
+# Local stacks only need the network to exist; mysql/redis stay in-project.
+if ! docker network inspect shared-infra >/dev/null 2>&1; then
+  echo "==> Creating shared-infra network (local placeholder)"
+  docker network create shared-infra >/dev/null
+fi
+
 if docker ps -a --format '{{.Names}}' | grep -q '^ai-tp-local-'; then
   echo "==> Removing leftover ai-tp-local stack (port conflict with ai-tp)..."
   docker compose -p ai-tp-local down --remove-orphans 2>/dev/null || true

@@ -101,11 +101,14 @@ services:
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8002/"]
       interval: 10s
       timeout: 5s
-      retries: 12
-      start_period: 40s
+      retries: 18
+      start_period: 120s
     expose:
       - "8002"
     mem_limit: ${API_MEM_LIMIT:-1g}
+    networks:
+      - default
+      - shared-infra
 
   worker:
     image: ${AI_TP_WORKER_IMAGE:-ai-tp-api:local}
@@ -141,6 +144,9 @@ services:
       api:
         condition: service_healthy
     mem_limit: ${WORKER_MEM_LIMIT:-1g}
+    networks:
+      - default
+      - shared-infra
 
   web:
     image: ${AI_TP_WEB_IMAGE:-ai-tp-web:local}
@@ -162,3 +168,10 @@ volumes:
   ai_tp_mysql:
   ai_tp_redis:
   ai_tp_data:
+
+# Always attach api/worker so Aliyun shared-mysql/shared-redis are resolvable.
+# Local deploy creates this network if missing (see local-deploy.sh).
+networks:
+  shared-infra:
+    external: true
+    name: shared-infra

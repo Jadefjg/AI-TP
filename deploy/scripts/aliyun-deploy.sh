@@ -107,7 +107,15 @@ fi
 
 COMPOSE=(docker compose -p "$COMPOSE_PROJECT_NAME" -f docker-compose.yml --env-file "$ENV_FILE")
 
+ensure_shared_network() {
+  if ! docker network inspect shared-infra >/dev/null 2>&1; then
+    echo "shared-infra network missing; create /opt/shared-infra first or use --isolated" >&2
+    exit 1
+  fi
+}
+
 connect_shared_network() {
+  # Belt-and-suspenders if an old container was started without the compose network.
   local svc cid
   for svc in api worker; do
     cid="$("${COMPOSE[@]}" ps -q "$svc" 2>/dev/null || true)"
@@ -115,8 +123,42 @@ connect_shared_network() {
     if docker inspect -f '{{json .NetworkSettings.Networks}}' "$cid" | grep -q '"shared-infra"'; then
       continue
     fi
-    docker network connect shared-infra "$cid"
+    echo "==> Connecting $svc to shared-infra"
+    docker network connect shared-infra "$cid" || true
   done
+}
+
+start_stack() {
+  local recreate_flags=("$@")
+  if $SHARED; then
+    ensure_shared_network
+    # Start API first so it joins shared-infra before worker/web wait on health.
+    echo "==> Starting api (shared-infra DB)..."
+    "${COMPOSE[@]}" up -d --no-deps --remove-orphans "${recreate_flags[@]}" api
+    connect_shared_network
+    echo "==> Waiting for API health before starting worker/web (up to 180s)..."
+    local deadline=$((SECONDS + 180))
+    local healthy=false
+    while (( SECONDS < deadline )); do
+      if "${COMPOSE[@]}" exec -T api curl -fsS http://127.0.0.1:8002/ >/dev/null 2>&1; then
+        echo "==> API healthy"
+        healthy=true
+        break
+      fi
+      sleep 3
+    done
+    if ! $healthy; then
+      echo "==> API not healthy; dumping logs:" >&2
+      "${COMPOSE[@]}" logs --tail=80 api >&2 || true
+      exit 1
+    fi
+    echo "==> Starting worker + web..."
+    "${COMPOSE[@]}" up -d --remove-orphans "${recreate_flags[@]}"
+    connect_shared_network
+  else
+    echo "==> Starting stack..."
+    "${COMPOSE[@]}" up -d --remove-orphans "${recreate_flags[@]}"
+  fi
 }
 
 echo "==> Checking Docker..."
@@ -139,8 +181,7 @@ fi
 if $PULL; then
   echo "==> Pulling images..."
   "${COMPOSE[@]}" pull
-  echo "==> Starting stack (no recreate if already running)..."
-  "${COMPOSE[@]}" up -d --remove-orphans --no-recreate
+  start_stack --no-recreate
 elif $BUILD; then
   echo "==> Building api + web (slim worker reuses api image unless --worker-tools)..."
   if $WORKER_TOOLS; then
@@ -148,20 +189,13 @@ elif $BUILD; then
   else
     "${COMPOSE[@]}" build api web
   fi
-  echo "==> Starting stack..."
-  "${COMPOSE[@]}" up -d --remove-orphans
+  start_stack
 else
-  echo "==> Starting stack (reuse images; do not recreate healthy containers)..."
-  "${COMPOSE[@]}" up -d --remove-orphans --no-recreate
+  start_stack --no-recreate
 fi
 
-if $SHARED; then
-  echo "==> Connecting api/worker to shared-infra network..."
-  connect_shared_network
-fi
-
-echo "==> Waiting for API health (up to 120s)..."
-deadline=$((SECONDS + 120))
+echo "==> Waiting for API health (final check, up to 60s)..."
+deadline=$((SECONDS + 60))
 healthy=false
 while (( SECONDS < deadline )); do
   if "${COMPOSE[@]}" exec -T api curl -fsS http://127.0.0.1:8002/ >/dev/null 2>&1; then
