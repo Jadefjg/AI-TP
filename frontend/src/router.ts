@@ -323,13 +323,17 @@ const router = createRouter({
               component: OpsAuditPage,
               meta: { requiresAuth: true, permission: "logs.read" },
             },
+            {
+              path: "k6-workers",
+              name: "k6-workers",
+              component: K6WorkersPage,
+              meta: { requiresAuth: true, permission: "worker.read" },
+            },
           ],
         },
         {
           path: "k6-workers",
-          name: "k6-workers",
-          component: K6WorkersPage,
-          meta: { requiresAuth: true, permission: "worker.read" },
+          redirect: "/ops/k6-workers",
         },
         {
           path: "forbidden",

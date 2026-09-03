@@ -161,6 +161,8 @@ services:
       api:
         condition: service_healthy
     ports:
+      # Interpolation reads --env-file / project .env, NOT service env_file.
+      # Aliyun host nginx already owns 8088 — set WEB_PUBLISH_PORT=8090 there.
       - "${WEB_PUBLISH_PORT:-8088}:80"
     mem_limit: ${WEB_MEM_LIMIT:-256m}
 

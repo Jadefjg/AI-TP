@@ -18,36 +18,70 @@ onMounted(() => {
 
 <template>
   <div v-if="overview" class="ops-overview">
-    <a-row :gutter="12">
+    <a-card title="运维工作流" class="ai-panel ai-guide-rail">
+      <div class="ai-guide-rail__row">
+        <div class="ai-guide ai-guide--horizontal">
+          <div class="ai-guide-step">
+            <span class="ai-guide-step__no">01</span>
+            <div>
+              <div class="ai-guide-step__title">观察健康</div>
+              <div class="ai-guide-step__desc">看评分、队列积压与 Worker 在线情况</div>
+            </div>
+          </div>
+          <div class="ai-guide-step">
+            <span class="ai-guide-step__no">02</span>
+            <div>
+              <div class="ai-guide-step__title">管控调度</div>
+              <div class="ai-guide-step__desc">白名单定时任务与 k6 节点启停</div>
+            </div>
+          </div>
+          <div class="ai-guide-step">
+            <span class="ai-guide-step__no">03</span>
+            <div>
+              <div class="ai-guide-step__title">追溯告警</div>
+              <div class="ai-guide-step__desc">通道状态与审计日志可下钻核对</div>
+            </div>
+          </div>
+        </div>
+        <div class="ai-next-hint">
+          <p class="ai-next-hint__title">Next · 运维提示</p>
+          <p class="ai-next-hint__desc">
+            队列积压或健康分偏低时，先看告警通道是否开启，再到定时任务核对最近一次执行；压测节点异常请进入 06 k6 节点探活。
+          </p>
+        </div>
+      </div>
+    </a-card>
+
+    <a-row :gutter="16">
       <a-col :span="6">
-        <a-card class="metric" size="small">
+        <a-card class="metric ai-panel" size="small">
           <div class="metric__label">健康评分</div>
           <div class="metric__value">{{ overview.health_score }}</div>
         </a-card>
       </a-col>
       <a-col :span="6">
-        <a-card class="metric" size="small">
+        <a-card class="metric ai-panel" size="small">
           <div class="metric__label">执行队列 pending</div>
           <div class="metric__value">{{ overview.queue.execution_pending }}</div>
         </a-card>
       </a-col>
       <a-col :span="6">
-        <a-card class="metric" size="small">
+        <a-card class="metric ai-panel" size="small">
           <div class="metric__label">AI 队列 pending</div>
           <div class="metric__value">{{ overview.queue.ai_pending }}</div>
         </a-card>
       </a-col>
       <a-col :span="6">
-        <a-card class="metric" size="small">
+        <a-card class="metric ai-panel" size="small">
           <div class="metric__label">定时任务启用</div>
           <div class="metric__value">{{ overview.scheduled_jobs.enabled }}/{{ overview.scheduled_jobs.total }}</div>
         </a-card>
       </a-col>
     </a-row>
 
-    <a-row :gutter="12" style="margin-top: 12px">
+    <a-row :gutter="16" style="margin-top: 16px">
       <a-col :span="12">
-        <a-card title="队列与 Worker" size="small">
+        <a-card title="队列与 Worker" class="ai-panel" size="small">
           <p>队列后端：{{ overview.queue.backend }}</p>
           <p>执行中：exec={{ overview.queue.execution_running }} · ai={{ overview.queue.ai_running }}</p>
           <p>k6 节点：{{ overview.workers.enabled }}/{{ overview.workers.total }} 启用</p>
@@ -56,7 +90,7 @@ onMounted(() => {
         </a-card>
       </a-col>
       <a-col :span="12">
-        <a-card title="告警通道状态" size="small">
+        <a-card title="告警通道状态" class="ai-panel" size="small">
           <a-space wrap>
             <a-tag :color="overview.alert_channels.run_failure_alert_enabled ? 'green' : 'red'">
               Run 失败告警 {{ overview.alert_channels.run_failure_alert_enabled ? "开" : "关" }}
@@ -73,7 +107,7 @@ onMounted(() => {
       </a-col>
     </a-row>
 
-    <a-card title="最近告警 / 异常审计" size="small" style="margin-top: 12px">
+    <a-card title="最近告警 / 异常审计" class="ai-panel" size="small" style="margin-top: 16px">
       <a-table
         :data="overview.recent_alerts"
         :pagination="false"
@@ -88,7 +122,7 @@ onMounted(() => {
       />
     </a-card>
   </div>
-  <a-empty v-else description="加载中或暂无数据" />
+  <a-empty v-else description="加载中或暂无数据" class="ai-empty" />
 </template>
 
 <style scoped>

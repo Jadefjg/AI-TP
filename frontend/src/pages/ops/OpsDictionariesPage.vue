@@ -77,43 +77,47 @@ onMounted(() => {
 
 <template>
   <div>
-    <a-space style="margin-bottom: 12px">
-      <a-button type="primary" :disabled="!canWrite()" @click="saveDict">新建/更新字典</a-button>
-      <a-button :disabled="!canWrite()" @click="seed">种子内置字典</a-button>
-      <a-button @click="load">刷新</a-button>
-    </a-space>
+    <a-card title="字典维护" class="ai-panel" style="margin-bottom: 16px">
+      <a-space style="margin-bottom: 12px">
+        <a-button type="primary" class="ai-action-btn" :disabled="!canWrite()" @click="saveDict">新建/更新字典</a-button>
+        <a-button :disabled="!canWrite()" @click="seed">种子内置字典</a-button>
+        <a-button @click="load">刷新</a-button>
+      </a-space>
 
-    <a-form layout="inline" style="margin-bottom: 12px">
-      <a-form-item label="编码"><a-input v-model="dictForm.code" style="width: 140px" /></a-form-item>
-      <a-form-item label="名称"><a-input v-model="dictForm.name" style="width: 160px" /></a-form-item>
-      <a-form-item label="描述"><a-input v-model="dictForm.description" style="width: 220px" /></a-form-item>
-    </a-form>
+      <a-form layout="inline">
+        <a-form-item label="编码"><a-input v-model="dictForm.code" style="width: 140px" /></a-form-item>
+        <a-form-item label="名称"><a-input v-model="dictForm.name" style="width: 160px" /></a-form-item>
+        <a-form-item label="描述"><a-input v-model="dictForm.description" style="width: 220px" /></a-form-item>
+      </a-form>
+    </a-card>
 
-    <a-row :gutter="12">
+    <a-row :gutter="16">
       <a-col :span="10">
-        <a-table
-          :data="dictionaries"
-          row-key="id"
-          :pagination="false"
-          :columns="[
-            { title: '编码', dataIndex: 'code' },
-            { title: '名称', dataIndex: 'name' },
-            { title: '操作', slotName: 'actions', width: 140 },
-          ]"
-          @row-click="selectDict"
-        >
-          <template #actions="{ record }">
-            <a-space>
-              <a-button size="mini" @click.stop="selectDict(record)">项</a-button>
-              <a-button size="mini" status="danger" :disabled="!canWrite()" @click.stop="removeDict(record)">
-                删
-              </a-button>
-            </a-space>
-          </template>
-        </a-table>
+        <a-card title="字典列表" class="ai-panel" size="small">
+          <a-table
+            :data="dictionaries"
+            row-key="id"
+            :pagination="false"
+            :columns="[
+              { title: '编码', dataIndex: 'code' },
+              { title: '名称', dataIndex: 'name' },
+              { title: '操作', slotName: 'actions', width: 140 },
+            ]"
+            @row-click="selectDict"
+          >
+            <template #actions="{ record }">
+              <a-space>
+                <a-button size="mini" @click.stop="selectDict(record)">项</a-button>
+                <a-button size="mini" status="danger" :disabled="!canWrite()" @click.stop="removeDict(record)">
+                  删
+                </a-button>
+              </a-space>
+            </template>
+          </a-table>
+        </a-card>
       </a-col>
       <a-col :span="14">
-        <a-card v-if="selected" :title="`字典项 · ${selected.name}`" size="small">
+        <a-card v-if="selected" :title="`字典项 · ${selected.name}`" class="ai-panel" size="small">
           <a-form layout="inline" style="margin-bottom: 8px">
             <a-form-item label="Key"><a-input v-model="itemForm.item_key" style="width: 100px" /></a-form-item>
             <a-form-item label="标签"><a-input v-model="itemForm.item_label" style="width: 120px" /></a-form-item>
@@ -132,7 +136,7 @@ onMounted(() => {
             ]"
           />
         </a-card>
-        <a-empty v-else description="选择左侧字典查看项" />
+        <a-empty v-else description="选择左侧字典查看项" class="ai-empty" />
       </a-col>
     </a-row>
   </div>

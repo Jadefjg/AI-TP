@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from "vue";
 import { adminApi } from "../api/admin";
-import AiWorkspaceHero from "../components/ai/AiWorkspaceHero.vue";
 import { listTablePagination } from "../constants/listPagination";
 import { DEFAULT_BASE_URL } from "../constants/platformDefaults";
 import { usePlatformStore } from "../state/platform";
@@ -42,25 +41,14 @@ onMounted(() => void load());
 </script>
 
 <template>
-  <div class="ai-workspace">
-    <AiWorkspaceHero
-      title="k6 节点"
-      subtitle="运维管理 · 分布式压测调度，对接本地节点或 HTTP Worker Agent"
-      badge="AI · PERF OPS"
-      status-label="调度就绪"
-      status-tone="online"
-    >
-      <template #extra>
-        <a-space>
-          <a-button @click="seed">种子本地节点</a-button>
-          <a-button type="primary" class="ai-action-btn" :loading="store.loading.value" @click="load">
-            刷新
-          </a-button>
-        </a-space>
-      </template>
-    </AiWorkspaceHero>
-
+  <div>
     <a-card title="注册节点" class="ai-panel" style="margin-bottom: 16px">
+      <a-space style="margin-bottom: 12px">
+        <a-button @click="seed">种子本地节点</a-button>
+        <a-button type="primary" class="ai-action-btn" :loading="store.loading.value" @click="load">
+          刷新
+        </a-button>
+      </a-space>
       <a-row :gutter="12">
         <a-col :span="6"><a-input v-model="form.name" placeholder="节点名称" /></a-col>
         <a-col :span="10"><a-input v-model="form.endpoint" placeholder="http://host:port" /></a-col>

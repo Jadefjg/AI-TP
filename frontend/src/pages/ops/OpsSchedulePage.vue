@@ -84,54 +84,56 @@ onMounted(() => {
     <a-alert
       type="info"
       show-icon
-      style="margin-bottom: 12px"
+      style="margin-bottom: 16px"
       title="安全约束：仅允许执行后端预注册 handler，禁止页面输入 Shell/SQL。"
     />
-    <a-space style="margin-bottom: 12px">
-      <a-button type="primary" :disabled="!canWrite()" @click="save">保存任务</a-button>
-      <a-button :disabled="!canWrite()" @click="seed">种子默认任务</a-button>
-      <a-button @click="load">刷新</a-button>
-    </a-space>
+    <a-card title="任务编排" class="ai-panel" style="margin-bottom: 16px">
+      <a-space style="margin-bottom: 12px">
+        <a-button type="primary" class="ai-action-btn" :disabled="!canWrite()" @click="save">保存任务</a-button>
+        <a-button :disabled="!canWrite()" @click="seed">种子默认任务</a-button>
+        <a-button @click="load">刷新</a-button>
+      </a-space>
 
-    <a-form layout="inline" style="margin-bottom: 12px">
-      <a-form-item label="名称"><a-input v-model="form.name" style="width: 160px" /></a-form-item>
-      <a-form-item label="Handler">
-        <a-select v-model="form.handler_key" style="width: 220px">
-          <a-option v-for="h in handlers" :key="h.key" :value="h.key">{{ h.label }}</a-option>
-        </a-select>
-      </a-form-item>
-      <a-form-item label="间隔(秒)">
-        <a-input-number v-model="form.interval_seconds" :min="60" :max="2592000" />
-      </a-form-item>
-      <a-form-item label="描述"><a-input v-model="form.description" style="width: 200px" /></a-form-item>
-    </a-form>
+      <a-form layout="inline" style="margin-bottom: 12px">
+        <a-form-item label="名称"><a-input v-model="form.name" style="width: 160px" /></a-form-item>
+        <a-form-item label="Handler">
+          <a-select v-model="form.handler_key" style="width: 220px">
+            <a-option v-for="h in handlers" :key="h.key" :value="h.key">{{ h.label }}</a-option>
+          </a-select>
+        </a-form-item>
+        <a-form-item label="间隔(秒)">
+          <a-input-number v-model="form.interval_seconds" :min="60" :max="2592000" />
+        </a-form-item>
+        <a-form-item label="描述"><a-input v-model="form.description" style="width: 200px" /></a-form-item>
+      </a-form>
 
-    <a-table
-      :data="jobs"
-      row-key="id"
-      :pagination="false"
-      :columns="[
-        { title: '名称', dataIndex: 'name' },
-        { title: 'Handler', dataIndex: 'handler_key', width: 180 },
-        { title: '间隔', dataIndex: 'interval_seconds', width: 90 },
-        { title: '状态', slotName: 'enabled', width: 90 },
-        { title: '上次', dataIndex: 'last_status', width: 100 },
-        { title: '操作', slotName: 'actions', width: 220 },
-      ]"
-    >
-      <template #enabled="{ record }">
-        <a-tag :color="record.enabled ? 'green' : 'gray'">{{ record.enabled ? "启用" : "停用" }}</a-tag>
-      </template>
-      <template #actions="{ record }">
-        <a-space>
-          <a-button size="mini" :disabled="!canWrite()" @click="toggle(record)">启停</a-button>
-          <a-button size="mini" type="primary" :disabled="!canWrite()" @click="runNow(record)">执行</a-button>
-          <a-button size="mini" @click="loadRuns(record.id)">记录</a-button>
-        </a-space>
-      </template>
-    </a-table>
+      <a-table
+        :data="jobs"
+        row-key="id"
+        :pagination="false"
+        :columns="[
+          { title: '名称', dataIndex: 'name' },
+          { title: 'Handler', dataIndex: 'handler_key', width: 180 },
+          { title: '间隔', dataIndex: 'interval_seconds', width: 90 },
+          { title: '状态', slotName: 'enabled', width: 90 },
+          { title: '上次', dataIndex: 'last_status', width: 100 },
+          { title: '操作', slotName: 'actions', width: 220 },
+        ]"
+      >
+        <template #enabled="{ record }">
+          <a-tag :color="record.enabled ? 'green' : 'gray'">{{ record.enabled ? "启用" : "停用" }}</a-tag>
+        </template>
+        <template #actions="{ record }">
+          <a-space>
+            <a-button size="mini" :disabled="!canWrite()" @click="toggle(record)">启停</a-button>
+            <a-button size="mini" type="primary" :disabled="!canWrite()" @click="runNow(record)">执行</a-button>
+            <a-button size="mini" @click="loadRuns(record.id)">记录</a-button>
+          </a-space>
+        </template>
+      </a-table>
+    </a-card>
 
-    <a-card v-if="selectedJobId" title="执行记录" size="small" style="margin-top: 12px">
+    <a-card v-if="selectedJobId" title="执行记录" class="ai-panel" size="small">
       <a-table
         :data="runs"
         row-key="id"

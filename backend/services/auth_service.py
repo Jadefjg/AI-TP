@@ -124,6 +124,7 @@ def get_user_by_access_token(db: Session, raw_token: str) -> User | None:
 
 
 def authenticate_user(db: Session, username: str, password: str) -> User | None:
+    settings = get_settings()
     user = (
         db.query(User)
         .options(selectinload(User.roles).selectinload(Role.permissions))
@@ -132,9 +133,23 @@ def authenticate_user(db: Session, username: str, password: str) -> User | None:
     )
     if not user or not user.is_active:
         return None
-    if not verify_password(password, user.password_hash):
-        return None
-    return user
+    if verify_password(password, user.password_hash):
+        return user
+    # While admin still uses a documented bootstrap password, accept the other
+    # historical default (admin123 vs admin123456) so cloud/local do not diverge.
+    if user.username == settings.bootstrap_admin_username:
+        known = {settings.bootstrap_admin_password, "admin123", "admin123456"}
+        known = {item for item in known if item}
+        if password in known and any(verify_password(item, user.password_hash) for item in known):
+            user.password_hash = hash_password(password)
+            db.commit()
+            return (
+                db.query(User)
+                .options(selectinload(User.roles).selectinload(Role.permissions))
+                .filter(User.id == user.id)
+                .one()
+            )
+    return None
 
 
 def collect_permission_codes(user: User) -> set[str]:

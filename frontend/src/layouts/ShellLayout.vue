@@ -55,18 +55,18 @@ const navEntries: Array<NavLeaf | NavGroup> = [
     children: [
       {
         to: "/ops/overview",
-        label: "运维总览",
+        label: "01 运维总览",
         permission: ["ops.read", "system.read"],
       },
-      { to: "/ops/schedule", label: "定时任务", permission: "schedule.read" },
-      { to: "/ops/dictionaries", label: "数据字典", permission: "dict.read" },
+      { to: "/ops/schedule", label: "02 定时任务", permission: "schedule.read" },
+      { to: "/ops/dictionaries", label: "03 数据字典", permission: "dict.read" },
       {
         to: "/ops/alerts",
-        label: "告警通道",
+        label: "04 告警通道",
         permission: ["ops.read", "settings.read"],
       },
-      { to: "/ops/audit", label: "日志审计", permission: "logs.read" },
-      { to: "/k6-workers", label: "k6 节点", permission: "worker.read" },
+      { to: "/ops/audit", label: "05 日志审计", permission: "logs.read" },
+      { to: "/ops/k6-workers", label: "06 k6 节点", permission: "worker.read" },
     ],
   },
   { type: "item", to: "/tenant", label: "租户管理", permission: "org.read" },
@@ -157,6 +157,10 @@ const isPipelineRoute = computed(() =>
     "/perf-management",
     "/security-management",
   ].some((prefix) => route.path === prefix || route.path.startsWith(`${prefix}/`)),
+);
+
+const isOpsRoute = computed(
+  () => route.path.startsWith("/ops") || route.path.startsWith("/k6-workers"),
 );
 
 const isProjectWorkspaceRoute = computed(() => {
@@ -406,7 +410,7 @@ onMounted(() => {
           <a-typography-title :heading="5" class="top-header__title">
             测试平台控制台
           </a-typography-title>
-          <span class="top-header__chip" :class="{ 'top-header__chip--pipeline': isPipelineRoute }">
+          <span class="top-header__chip" :class="{ 'top-header__chip--pipeline': isPipelineRoute || isOpsRoute }">
             <span class="top-header__chip-dot" />
             NEURAL · READY
           </span>

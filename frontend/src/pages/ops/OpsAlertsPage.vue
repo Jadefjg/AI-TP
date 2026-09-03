@@ -25,10 +25,10 @@ onMounted(() => {
     <a-alert
       type="warning"
       show-icon
-      style="margin-bottom: 12px"
+      style="margin-bottom: 16px"
       title="告警通道密钥在系统配置中维护；本页仅展示可观测状态，不暴露密钥。"
     />
-    <a-card title="通道概览" size="small">
+    <a-card title="通道概览" class="ai-panel" size="small">
       <a-descriptions :column="1" bordered size="small" v-if="overview">
         <a-descriptions-item label="Run 失败告警">
           {{ channels.run_failure_alert_enabled ? "已启用" : "未启用" }}
@@ -43,10 +43,12 @@ onMounted(() => {
           {{ channels.metrics_auth_enabled ? "已启用" : "未启用" }}
         </a-descriptions-item>
       </a-descriptions>
+      <a-space style="margin-top: 16px">
+        <a-button type="primary" class="ai-action-btn" @click="() => router.push({ name: 'settings' })">
+          前往系统配置
+        </a-button>
+        <a-button @click="load">刷新状态</a-button>
+      </a-space>
     </a-card>
-    <a-space style="margin-top: 12px">
-      <a-button type="primary" @click="() => router.push({ name: 'settings' })">前往系统配置</a-button>
-      <a-button @click="load">刷新状态</a-button>
-    </a-space>
   </div>
 </template>
