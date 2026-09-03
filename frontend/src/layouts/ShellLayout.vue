@@ -124,7 +124,8 @@ const visibleNavEntries = computed(() =>
     .filter(Boolean) as Array<NavLeaf | NavGroup>,
 );
 
-const openKeys = ref<string[]>(["ai-pipeline"]);
+/** 侧栏分组默认收缩；仅在进入对应路由时自动展开当前分组。 */
+const openKeys = ref<string[]>([]);
 
 const selectedKey = computed(() => {
   if (route.path.startsWith("/billing")) return "/tenant";
@@ -175,7 +176,19 @@ const projectSelectOptions = computed(() =>
 watch(
   () => route.path,
   (path) => {
-    const keysToOpen: string[] = ["ai-pipeline"];
+    const keysToOpen: string[] = [];
+    if (
+      [
+        "/requirements",
+        "/cases",
+        "/ui-management",
+        "/interface-management",
+        "/perf-management",
+        "/security-management",
+      ].some((prefix) => path === prefix || path.startsWith(`${prefix}/`))
+    ) {
+      keysToOpen.push("ai-pipeline");
+    }
     if (path.startsWith("/system-users")) keysToOpen.push("system-users");
     if (path.startsWith("/k6-workers") || path.startsWith("/ops")) keysToOpen.push("perf-ops");
     if (path === "/system" || path.startsWith("/system/") || path.startsWith("/logs")) {
