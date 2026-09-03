@@ -42,7 +42,7 @@ const navEntries: Array<NavLeaf | NavGroup> = [
     label: "智能流水",
     children: [
       { to: "/requirements", label: "01 需求 Agent", permission: "ai.read" },
-      { to: "/ui-management", label: "02 UI Agent", permission: "case.read" },
+      { to: "/ui-management", label: "02 UI Agent", permission: "ai.read" },
       { to: "/interface-management", label: "03 接口 Agent", permission: "ai.read" },
       { to: "/perf-management", label: "04 性能 Agent", permission: "ai.read" },
       { to: "/security-management", label: "05 安全 Agent", permission: "ai.read" },
@@ -398,7 +398,7 @@ onMounted(() => {
         </div>
         <div v-if="store.currentUser.value" class="top-header__actions">
           <a-select
-            v-if="store.hasPermission('project.read') || store.hasPermission('ai.read')"
+            v-if="store.hasPermission('project.read') || store.hasPermission('ai.read') || store.hasPermission('case.read')"
             :model-value="globalProjectId ?? undefined"
             allow-search
             placeholder="选择项目"

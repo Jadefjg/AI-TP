@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
-from backend.api.auth import require_permission
+from backend.api.auth import require_any_permission, require_permission
 from backend.api.deps import get_tenant_project
 from backend.db.session import get_db
 from backend.models.entities import FunctionalCase, Project
@@ -102,7 +102,7 @@ async def generate_cases_agent(
 
 @router.get(
     "/{project_id}/functional-cases/export",
-    dependencies=[Depends(require_permission("case.read"))],
+    dependencies=[Depends(require_any_permission("case.read", "ai.read"))],
 )
 def export_cases(project: Project = Depends(get_tenant_project), db: Session = Depends(get_db)) -> JSONResponse:
     rows = (
@@ -226,7 +226,7 @@ def create_case(
 @router.get(
     "/{project_id}/functional-cases",
     response_model=list[FunctionalCaseOut],
-    dependencies=[Depends(require_permission("case.read"))],
+    dependencies=[Depends(require_any_permission("case.read", "ai.read"))],
 )
 def list_cases(
     suite_id: int | None = Query(default=None),
@@ -245,7 +245,7 @@ def list_cases(
 @router.get(
     "/{project_id}/functional-cases/{case_id}",
     response_model=FunctionalCaseOut,
-    dependencies=[Depends(require_permission("case.read"))],
+    dependencies=[Depends(require_any_permission("case.read", "ai.read"))],
 )
 def get_case(
     case_id: int,

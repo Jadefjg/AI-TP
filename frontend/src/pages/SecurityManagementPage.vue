@@ -5,6 +5,7 @@ import { useRoute, useRouter } from "vue-router";
 import { aiApi } from "../api/ai";
 import { projectsApi } from "../api/projects";
 import AiBusyBanner from "../components/ai/AiBusyBanner.vue";
+import AiAgentReadyAlert from "../components/ai/AiAgentReadyAlert.vue";
 import AiPipelineBar from "../components/ai/AiPipelineBar.vue";
 import AiWorkspaceHero from "../components/ai/AiWorkspaceHero.vue";
 import {
@@ -418,6 +419,7 @@ onMounted(() => {
       </AiWorkspaceHero>
 
       <AiPipelineBar current="security" :handoff="pipelineHandoff" />
+      <AiAgentReadyAlert agent-key="security" />
     </div>
 
     <AiBusyBanner :active="busyActive" :title="busyTitle" />

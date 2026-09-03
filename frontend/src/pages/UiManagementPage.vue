@@ -6,6 +6,7 @@ import { casesApi } from "../api/cases";
 import { projectsApi } from "../api/projects";
 import { previewUiScriptLocally, uiAutomationApi } from "../api/uiAutomation";
 import AiBusyBanner from "../components/ai/AiBusyBanner.vue";
+import AiAgentReadyAlert from "../components/ai/AiAgentReadyAlert.vue";
 import AiPipelineBar from "../components/ai/AiPipelineBar.vue";
 import AiWorkspaceHero from "../components/ai/AiWorkspaceHero.vue";
 import {
@@ -41,8 +42,12 @@ const scriptJson = ref(
   `{\n  "version": "1",\n  "base_url": "${defaultUiBase()}",\n  "steps": []\n}`,
 );
 
-const canCaseRead = computed(() => store.hasPermission("case.read"));
-const canCaseWrite = computed(() => store.hasPermission("case.write"));
+const canCaseRead = computed(
+  () => store.hasPermission("ai.read") || store.hasPermission("case.read"),
+);
+const canCaseWrite = computed(
+  () => store.hasPermission("ai.execute") || store.hasPermission("case.write"),
+);
 
 const selectedProject = computed(
   () => projects.value.find((item) => item.id === projectId.value) ?? null,
@@ -400,6 +405,7 @@ onMounted(() => {
       </AiWorkspaceHero>
 
       <AiPipelineBar current="ui" :handoff="pipelineHandoff" />
+      <AiAgentReadyAlert agent-key="ui" />
     </div>
 
     <AiBusyBanner :active="busyAction === 'agent' || busyAction === 'generate'" title="Playwright GUI Agent 工作中" />
@@ -431,7 +437,10 @@ onMounted(() => {
         </div>
         <div class="ai-next-hint">
           <p class="ai-next-hint__title">Next · 流水提示</p>
-          <p class="ai-next-hint__desc">UI 跑通后可带 case_id 进入接口 Agent，生成并执行 API DSL。</p>
+          <p class="ai-next-hint__desc">
+            若无功能用例，请先在「01 需求 Agent」评审并转成用例；无 Playwright 时仍可生成 DSL，执行会标记为 skipped。
+            UI 跑通后可带 case_id 进入接口 Agent，生成并执行 API DSL。
+          </p>
         </div>
       </div>
     </a-card>

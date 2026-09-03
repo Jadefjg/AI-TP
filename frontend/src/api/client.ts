@@ -222,13 +222,27 @@ export async function fetchAuthedText(path: string): Promise<string> {
 export function openAuthedHtml(path: string) {
   const token = authStore.getToken();
   void fetch(`${BASE_URL}${path}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
-    .then((res) => res.text())
-    .then((html) => {
+    .then(async (res) => {
+      const text = await res.text();
+      if (!res.ok) {
+        let detail = text.slice(0, 200);
+        try {
+          const data = JSON.parse(text) as { detail?: unknown };
+          if (typeof data.detail === "string") detail = data.detail;
+        } catch {
+          // keep raw text
+        }
+        throw new Error(detail || `打开失败（HTTP ${res.status}）`);
+      }
       const w = window.open("", "_blank");
       if (w) {
-        w.document.write(html);
+        w.document.write(text);
         w.document.close();
       }
+    })
+    .catch((error) => {
+      const message = error instanceof Error ? error.message : String(error);
+      window.alert(`无法打开报告：${message}`);
     });
 }
 

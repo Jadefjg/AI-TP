@@ -6,6 +6,7 @@ import { aiApi } from "../api/ai";
 import { casesApi } from "../api/cases";
 import { projectsApi } from "../api/projects";
 import AiBusyBanner from "../components/ai/AiBusyBanner.vue";
+import AiAgentReadyAlert from "../components/ai/AiAgentReadyAlert.vue";
 import AiPipelineBar from "../components/ai/AiPipelineBar.vue";
 import AiWorkspaceHero from "../components/ai/AiWorkspaceHero.vue";
 import {
@@ -16,7 +17,6 @@ import {
 } from "../constants/aiPipeline";
 import { listTablePagination } from "../constants/listPagination";
 import { formatCaseInfoForApi } from "../constants/requirementArtifactModules";
-import { DEFAULT_BASE_URL } from "../constants/platformDefaults";
 import { resolveProjectBaseUrl } from "../constants/projectDefaults";
 import { usePlatformStore } from "../state/platform";
 import type { AiArtifact, FunctionalCase, Project } from "../types";
@@ -46,7 +46,7 @@ const viewTitle = ref("产物详情");
 const viewJsonText = ref("");
 const latestOpenApiPayload = ref<Record<string, unknown> | null>(null);
 const latestExecResult = ref<Record<string, unknown> | null>(null);
-const baseUrl = ref(DEFAULT_BASE_URL);
+const baseUrl = ref("");
 const selectedArtifactId = ref<number | null>(null);
 const tablePagination = listTablePagination(10);
 
@@ -205,6 +205,14 @@ const syncBaseUrlFromProject = (project: Project | null) => {
 const ensureProject = () => {
   if (!projectId.value) {
     Message.warning("请先选择项目");
+    return false;
+  }
+  return true;
+};
+
+const ensureBaseUrl = () => {
+  if (!baseUrl.value.trim()) {
+    Message.warning("请先填写被测系统 Base URL（勿使用平台自身地址）");
     return false;
   }
   return true;
@@ -522,6 +530,7 @@ const viewArtifact = (row: AiArtifact) => {
 
 const executeArtifact = (row: AiArtifact) => {
   if (!ensureProject()) return;
+  if (!ensureBaseUrl()) return;
   if (!canAiExecute.value) {
     Message.warning("缺少 ai.execute 权限");
     return;
@@ -630,6 +639,7 @@ onMounted(() => {
       </AiWorkspaceHero>
 
       <AiPipelineBar current="interface" :handoff="pipelineHandoff" />
+      <AiAgentReadyAlert agent-key="interface" />
     </div>
 
     <AiBusyBanner :active="busyActive" :title="busyTitle" />
@@ -862,7 +872,7 @@ onMounted(() => {
             </div>
             <div v-if="canAiExecute" class="ai-field" style="margin-top: 12px">
               <div class="ai-field__label">执行参数</div>
-              <a-input v-model="baseUrl" placeholder="Base URL，例如 http://127.0.0.1:8002">
+                <a-input v-model="baseUrl" placeholder="被测系统 Base URL，例如 https://api.example.com">
                 <template #prefix>Base URL</template>
               </a-input>
               <a-typography-paragraph type="secondary" style="margin-top: 6px; margin-bottom: 0">

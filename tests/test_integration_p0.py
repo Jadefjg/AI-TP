@@ -10,16 +10,11 @@ from backend.models.entities import TestRun as TestRunRow
 from backend.services.auth_service import hash_password
 from backend.services.job_queue import process_job
 from tests.auth_helpers import login_with_encrypted_password
+from tests.project_helpers import create_test_project
 
 
 def _create_project(client: TestClient, headers: dict[str, str]) -> int:
-    res = client.post(
-        "/projects",
-        headers=headers,
-        json={"name": "p0-test", "code_root": ".", "repo_source": "local"},
-    )
-    assert res.status_code == 200, res.text
-    return res.json()["id"]
+    return create_test_project(client, headers, name="p0-test")
 
 
 def test_case_crud_forbidden_without_write(client: TestClient, db: Session, admin_headers: dict[str, str]):

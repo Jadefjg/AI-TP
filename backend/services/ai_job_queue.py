@@ -80,20 +80,30 @@ def enqueue_ai_job(
 
     settings = get_settings()
     backend = (settings.job_queue_backend or "db").strip().lower()
-    if backend in {"rq", "celery"}:
-        _dispatch_ai_queue(job.id)
-    elif backend == "redis" and settings.redis_url:
-        _dispatch_ai_queue(job.id)
-    else:
-        # Local/dev: process in a daemon thread so 202 returns immediately without a worker process.
-        import threading
+    try:
+        if backend in {"rq", "celery"}:
+            _dispatch_ai_queue(job.id)
+        elif backend == "redis" and settings.redis_url:
+            _dispatch_ai_queue(job.id)
+        else:
+            # Local/dev: process in a daemon thread so 202 returns immediately without a worker process.
+            import threading
 
-        threading.Thread(
-            target=_process_ai_job_in_thread,
-            args=(job.id,),
-            name=f"ai-async-job-{job.id}",
-            daemon=True,
-        ).start()
+            threading.Thread(
+                target=_process_ai_job_in_thread,
+                args=(job.id,),
+                name=f"ai-async-job-{job.id}",
+                daemon=True,
+            ).start()
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("failed to dispatch ai job #%s", job.id)
+        job.status = JobStatus.failed.value
+        job.last_error = f"dispatch failed: {exc}"
+        job.finished_at = _now()
+        db.add(job)
+        db.commit()
+        db.refresh(job)
+        raise ValueError(job.last_error) from exc
     return job
 
 

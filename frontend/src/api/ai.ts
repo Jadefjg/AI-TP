@@ -6,7 +6,7 @@ import type {
   WorkbenchSession,
 } from "../types";
 import { downloadBlob, openAuthedHtml, req, reqFormData } from "./client";
-import { DEFAULT_BASE_URL } from "../constants/platformDefaults";
+import { DEFAULT_BASE_URL, DEFAULT_UI_BASE_URL } from "../constants/platformDefaults";
 
 export type AiAsyncJob = {
   id: number;
@@ -119,6 +119,27 @@ export const aiApi = {
       },
       { timeoutMs: 120_000 },
     ),
+  getPipelineStatus: () =>
+    req<{
+      llm: {
+        configured: boolean;
+        provider: string;
+        high_precision_model: string;
+        bulk_model: string;
+        stub_on_failure?: boolean;
+      };
+      agents: Array<{
+        order: number;
+        key: string;
+        label: string;
+        module_type: string;
+        engine: string;
+        generate_ready: boolean;
+        execute_ready: boolean;
+        hint: string;
+        tools: Record<string, unknown>;
+      }>;
+    }>("/ai/pipeline-status"),
   aiFunctionalCases: (projectId: number, body: { requirement_text: string; openapi_content?: string }) =>
     enqueueAiAndWait(projectId, {
       module_type: "functional_cases",
@@ -320,13 +341,13 @@ export const aiApi = {
     req<Record<string, unknown>>(`/projects/${projectId}/perf/k6-jobs/${jobId}/analyze-bottleneck`, {
       method: "POST",
     }),
-  dispatchPerfArtifact: (projectId: number, artifactId: number, baseUrl?: string, distributed = false) =>
+  dispatchPerfArtifact: (projectId: number, artifactId: number, baseUrl: string, distributed = false) =>
     req<Record<string, unknown>>(
       `/projects/${projectId}/ai/artifacts/${artifactId}/dispatch-perf`,
       {
         method: "POST",
         body: JSON.stringify({
-          base_url: baseUrl || "http://127.0.0.1:8002",
+          base_url: baseUrl,
           distributed,
         }),
       },
@@ -335,7 +356,7 @@ export const aiApi = {
   previewUiScript: (projectId: number, uiScript: unknown, baseUrl?: string) =>
     req<Record<string, unknown>>(`/projects/${projectId}/ui-automation/preview`, {
       method: "POST",
-      body: JSON.stringify({ ui_script: uiScript, base_url: baseUrl || "http://127.0.0.1:5173" }),
+      body: JSON.stringify({ ui_script: uiScript, base_url: baseUrl || DEFAULT_UI_BASE_URL }),
     }),
   executeUiStep: (projectId: number, uiScript: unknown, stepIndex: number, baseUrl?: string) =>
     req<Record<string, unknown>>(`/projects/${projectId}/ui-automation/execute-step`, {
@@ -343,7 +364,7 @@ export const aiApi = {
       body: JSON.stringify({
         ui_script: uiScript,
         step_index: stepIndex,
-        base_url: baseUrl || "http://127.0.0.1:5173",
+        base_url: baseUrl || DEFAULT_UI_BASE_URL,
       }),
     }),
   getCaseUiScript: (projectId: number, caseId: number) =>

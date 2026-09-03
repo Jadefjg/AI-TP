@@ -20,6 +20,12 @@ def internal_k6_run(
     x_worker_token: str | None = Header(default=None),
 ) -> dict:
     settings = get_settings()
-    if settings.k6_worker_token and x_worker_token != settings.k6_worker_token:
+    expected = (settings.k6_worker_token or "").strip()
+    if not expected:
+        raise HTTPException(
+            status_code=503,
+            detail="K6_WORKER_TOKEN is not configured; refusing unauthenticated internal k6 runs",
+        )
+    if x_worker_token != expected:
         raise HTTPException(status_code=403, detail="invalid worker token")
     return run_internal_k6_script(body.script, timeout_sec=body.timeout_sec)

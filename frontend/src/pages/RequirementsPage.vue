@@ -4,6 +4,7 @@ import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { aiApi } from "../api/ai";
 import AiBusyBanner from "../components/ai/AiBusyBanner.vue";
+import AiAgentReadyAlert from "../components/ai/AiAgentReadyAlert.vue";
 import AiPipelineBar from "../components/ai/AiPipelineBar.vue";
 import AiWorkspaceHero from "../components/ai/AiWorkspaceHero.vue";
 import { projectsApi } from "../api/projects";
@@ -368,6 +369,7 @@ onMounted(() => {
       </AiWorkspaceHero>
 
       <AiPipelineBar current="requirements" :handoff="pipelineHandoff" />
+      <AiAgentReadyAlert agent-key="requirement" />
     </div>
 
     <AiBusyBanner :active="analyzing" title="AI Agent 正在评审需求" />

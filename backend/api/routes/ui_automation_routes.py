@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from backend.api.auth import require_permission
+from backend.api.auth import require_any_permission
 from backend.api.deps import get_tenant_project
 from backend.db.session import get_db
 from backend.models.entities import Project
@@ -15,10 +15,14 @@ from backend.services.engines.ui_playwright import steps_from_functional_case, s
 
 router = APIRouter(prefix="/projects", tags=["ui-automation"])
 
+# Align with pipeline Agents: ai.* preferred; keep case.* for legacy roles.
+_UI_READ = Depends(require_any_permission("ai.read", "case.read"))
+_UI_WRITE = Depends(require_any_permission("ai.execute", "case.write"))
+
 
 @router.post(
     "/{project_id}/ui-automation/preview",
-    dependencies=[Depends(require_permission("case.read"))],
+    dependencies=[_UI_READ],
 )
 def preview_ui_script(
     body: UiScriptPreviewIn,
@@ -30,7 +34,7 @@ def preview_ui_script(
 
 @router.post(
     "/{project_id}/ui-automation/execute-step",
-    dependencies=[Depends(require_permission("case.write"))],
+    dependencies=[_UI_WRITE],
 )
 def execute_ui_single_step(
     body: UiScriptStepExecuteIn,
@@ -52,7 +56,7 @@ def execute_ui_single_step(
 
 @router.post(
     "/{project_id}/ui-automation/execute-agent",
-    dependencies=[Depends(require_permission("case.write"))],
+    dependencies=[_UI_WRITE],
 )
 def execute_ui_gui_agent(
     body: UiScriptPreviewIn,
@@ -75,7 +79,7 @@ def execute_ui_gui_agent(
 
 @router.get(
     "/{project_id}/ui-automation/cases/{case_id}/script",
-    dependencies=[Depends(require_permission("case.read"))],
+    dependencies=[_UI_READ],
 )
 def get_case_ui_script(
     case_id: int,
@@ -90,7 +94,7 @@ def get_case_ui_script(
 
 @router.put(
     "/{project_id}/ui-automation/cases/{case_id}/script",
-    dependencies=[Depends(require_permission("case.write"))],
+    dependencies=[_UI_WRITE],
 )
 def update_case_ui_script(
     case_id: int,
@@ -115,7 +119,7 @@ def update_case_ui_script(
 
 @router.post(
     "/{project_id}/ui-automation/cases/{case_id}/generate-from-case",
-    dependencies=[Depends(require_permission("case.write"))],
+    dependencies=[_UI_WRITE],
 )
 def generate_ui_from_case(
     case_id: int,

@@ -83,3 +83,30 @@ def test_ai_agents_catalog_endpoint(client, admin_headers):
     assert "calls" in body["gateway"]
     assert "coverage" in body["quality"]
     assert "security_false_positive" in body["quality"]
+
+
+def test_pipeline_status_payload_and_endpoint(client, admin_headers):
+    from backend.services.agents.readiness import pipeline_status_payload
+
+    payload = pipeline_status_payload()
+    assert "llm" in payload
+    assert "configured" in payload["llm"]
+    assert [row["key"] for row in payload["agents"]] == [
+        "requirement",
+        "ui",
+        "interface",
+        "perf",
+        "security",
+    ]
+    for row in payload["agents"]:
+        assert "generate_ready" in row
+        assert "execute_ready" in row
+        assert "hint" in row
+
+    denied = client.get("/ai/pipeline-status")
+    assert denied.status_code == 401
+    res = client.get("/ai/pipeline-status", headers=admin_headers)
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["llm"]["provider"]
+    assert len(body["agents"]) == 5

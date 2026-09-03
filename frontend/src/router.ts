@@ -102,7 +102,7 @@ const router = createRouter({
           path: "ui-management",
           name: "ui-management",
           component: UiManagementPage,
-          meta: { requiresAuth: true, permission: "case.read" },
+          meta: { requiresAuth: true, permission: "ai.read" },
         },
         {
           path: "interface-management",

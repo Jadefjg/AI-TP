@@ -3,16 +3,11 @@ from __future__ import annotations
 from fastapi.testclient import TestClient
 
 from tests.auth_helpers import login_with_encrypted_password
+from tests.project_helpers import create_test_project
 
 
 def _create_project(client: TestClient, headers: dict[str, str]) -> int:
-    res = client.post(
-        "/projects",
-        headers=headers,
-        json={"name": "ai-auth-test", "code_root": ".", "repo_source": "local"},
-    )
-    assert res.status_code == 200, res.text
-    return res.json()["id"]
+    return create_test_project(client, headers, name="ai-auth-test")
 
 
 def test_project_ai_list_routes_require_bearer_token(client: TestClient, admin_headers: dict[str, str]):

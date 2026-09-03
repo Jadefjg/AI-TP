@@ -47,7 +47,10 @@ class Settings(BaseSettings):
     smtp_outbox_dir: str = "./data/mail_outbox"
 
     default_test_timeout_sec: int = 600
-    backend_cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
+    backend_cors_origins: str = (
+        "http://localhost:5173,http://127.0.0.1:5173,"
+        "http://localhost:5174,http://127.0.0.1:5174"
+    )
     rag_top_k: int = 5
     rag_chunk_size: int = 500
     rag_embedding_mode: str = "auto"

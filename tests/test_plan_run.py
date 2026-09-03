@@ -1,12 +1,9 @@
 from backend.services.plan_run_service import resolve_functional_case_ids
+from tests.project_helpers import create_test_project
 
 
 def test_resolve_suite_case_ids(db, admin_headers, client):
-    project_id = client.post(
-        "/projects",
-        headers=admin_headers,
-        json={"name": "plan-run", "code_root": ".", "repo_source": "local"},
-    ).json()["id"]
+    project_id = create_test_project(client, admin_headers, name="plan-run")
     case = client.post(
         f"/projects/{project_id}/functional-cases",
         headers=admin_headers,
@@ -27,11 +24,7 @@ def test_resolve_suite_case_ids(db, admin_headers, client):
 
 
 def test_start_run_functional_kind(client, db, admin_headers):
-    project_id = client.post(
-        "/projects",
-        headers=admin_headers,
-        json={"name": "fn-kind", "code_root": ".", "repo_source": "local"},
-    ).json()["id"]
+    project_id = create_test_project(client, admin_headers, name="fn-kind")
     case = client.post(
         f"/projects/{project_id}/functional-cases",
         headers=admin_headers,

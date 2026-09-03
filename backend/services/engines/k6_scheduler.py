@@ -66,8 +66,17 @@ def _run_on_http_worker(
     settings = get_settings()
     url = f"{node.endpoint.rstrip('/')}/internal/k6/run"
     headers = {"Content-Type": "application/json"}
-    if settings.k6_worker_token:
-        headers["X-Worker-Token"] = settings.k6_worker_token
+    token = (settings.k6_worker_token or "").strip()
+    if not token:
+        return {
+            "status": "skipped",
+            "worker": node.name,
+            "mode": "http",
+            "detail": {"reason": "K6_WORKER_TOKEN is not configured"},
+            "stdout": "",
+            "stderr": "K6_WORKER_TOKEN is not configured",
+        }
+    headers["X-Worker-Token"] = token
     try:
         with httpx.Client(timeout=timeout_sec + 30) as client:
             resp = client.post(

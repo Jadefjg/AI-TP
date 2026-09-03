@@ -5,6 +5,7 @@ import { useRoute, useRouter } from "vue-router";
 import { aiApi } from "../api/ai";
 import { projectsApi } from "../api/projects";
 import AiBusyBanner from "../components/ai/AiBusyBanner.vue";
+import AiAgentReadyAlert from "../components/ai/AiAgentReadyAlert.vue";
 import AiPipelineBar from "../components/ai/AiPipelineBar.vue";
 import AiWorkspaceHero from "../components/ai/AiWorkspaceHero.vue";
 import {
@@ -38,7 +39,7 @@ const latestExecResult = ref<Record<string, unknown> | null>(null);
 const viewVisible = ref(false);
 const viewTitle = ref("产物详情");
 const viewJsonText = ref("");
-const baseUrl = ref("http://127.0.0.1:8002");
+const baseUrl = ref("");
 const perfDistributed = ref(false);
 const tableLoading = ref(false);
 const tablePagination = listTablePagination(10);
@@ -133,6 +134,14 @@ const syncBaseUrlFromProject = (project: Project | null) => {
 const ensureProject = () => {
   if (!projectId.value) {
     Message.warning("请先选择项目");
+    return false;
+  }
+  return true;
+};
+
+const ensureBaseUrl = () => {
+  if (!baseUrl.value.trim()) {
+    Message.warning("请先填写被测系统 Base URL（勿使用平台自身地址）");
     return false;
   }
   return true;
@@ -269,6 +278,7 @@ const viewArtifact = (row: AiArtifact) => {
 
 const executeArtifact = (row: AiArtifact) => {
   if (!ensureProject()) return;
+  if (!ensureBaseUrl()) return;
   if (!canAiExecute.value) {
     Message.warning("缺少 ai.execute 权限");
     return;
@@ -383,6 +393,7 @@ onMounted(() => {
       </AiWorkspaceHero>
 
       <AiPipelineBar current="perf" :handoff="pipelineHandoff" />
+      <AiAgentReadyAlert agent-key="perf" />
     </div>
 
     <AiBusyBanner :active="busyActive" :title="busyTitle" />
@@ -499,7 +510,7 @@ onMounted(() => {
             <div v-if="canAiExecute" class="ai-field" style="margin-top: 12px">
               <div class="ai-field__label">执行参数</div>
               <a-space direction="vertical" fill style="width: 100%">
-                <a-input v-model="baseUrl" placeholder="Base URL，例如 http://127.0.0.1:8002">
+                <a-input v-model="baseUrl" placeholder="被测系统 Base URL，例如 https://api.example.com">
                   <template #prefix>Base URL</template>
                 </a-input>
                 <a-checkbox v-model="perfDistributed">优先分布式调度（有 Worker 时）</a-checkbox>

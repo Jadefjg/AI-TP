@@ -210,6 +210,14 @@ def list_test_agents(db: Session = Depends(get_db)) -> dict:
     }
 
 
+@router.get("/ai/pipeline-status", dependencies=[Depends(require_permission("ai.read"))])
+def ai_pipeline_status() -> dict:
+    """LLM + per-agent tool readiness for the five pipeline Agents."""
+    from backend.services.agents.readiness import pipeline_status_payload
+
+    return pipeline_status_payload()
+
+
 def _build_ai_job_request(payload: AiAsyncJobEnqueueIn) -> dict:
     module = payload.module_type.strip()
     if module not in QUEUEABLE_MODULES:

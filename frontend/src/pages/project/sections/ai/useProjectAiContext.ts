@@ -11,7 +11,6 @@ import {
 } from "vue";
 import { aiApi } from "../../../../api/ai";
 import { useProjectScope } from "../../../../composables/useProjectScope";
-import { DEFAULT_BASE_URL, DEFAULT_HEALTH_URL } from "../../../../constants/platformDefaults";
 import { resolveProjectBaseUrl, resolveProjectHealthUrl } from "../../../../constants/projectDefaults";
 import { usePlatformStore } from "../../../../state/platform";
 import { projectsApi } from "../../../../api/projects";
@@ -70,8 +69,8 @@ export function provideProjectAiContext(): ProjectAiContext {
     bizDesc: "",
     apiDoc: "",
     apiParams: "",
-    baseUrl: DEFAULT_BASE_URL,
-    targetUrl: DEFAULT_HEALTH_URL,
+    baseUrl: "",
+    targetUrl: "",
     scanMethod: "GET",
     paramName: "q",
     paramValue: "test",
@@ -172,8 +171,8 @@ export function provideProjectAiContext(): ProjectAiContext {
           aiForm.baseUrl = resolveProjectBaseUrl(project as Project);
           aiForm.targetUrl = resolveProjectHealthUrl(project as Project);
         } catch {
-          aiForm.baseUrl = DEFAULT_BASE_URL;
-          aiForm.targetUrl = DEFAULT_HEALTH_URL;
+          aiForm.baseUrl = "";
+          aiForm.targetUrl = "";
         }
       });
     },
