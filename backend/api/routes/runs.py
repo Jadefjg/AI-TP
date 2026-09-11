@@ -11,6 +11,7 @@ from backend.services.orchestrator import ALLOWED_KINDS, create_run_with_items
 from backend.services.audit_service import log_action
 from backend.services.plan_run_service import resolve_functional_case_ids
 from backend.services.tenant_service import filter_projects_for_user, is_platform_user
+from backend.services.project_base_url import resolve_project_base_url
 
 router = APIRouter(tags=["runs"])
 
@@ -68,20 +69,24 @@ def start_run(
         raise HTTPException(status_code=400, detail=f"unknown kinds: {unknown}")
 
     run = create_run_with_items(db, project_id=project.id, kinds=kinds)
+    # Resolve omitted execution targets from the project configuration.  The
+    # request model deliberately keeps these fields optional so API/CI callers
+    # do not accidentally target the local development default.
+    project_base_url = resolve_project_base_url(project)
     run_options = {
         "suite_id": body.suite_id,
         "plan_id": body.plan_id,
         "functional_case_ids": functional_case_ids,
-        "api_base_url": body.api_base_url,
+        "api_base_url": body.api_base_url or project_base_url,
         "api_mode": body.api_mode,
         "regression_set_id": body.regression_set_id,
         "api_artifact_ids": body.api_artifact_ids,
-        "perf_base_url": body.perf_base_url,
+        "perf_base_url": body.perf_base_url or project_base_url,
         "perf_mode": body.perf_mode,
         "perf_artifact_id": body.perf_artifact_id,
         "perf_distributed": body.perf_distributed,
         "security_mode": body.security_mode,
-        "security_target_url": body.security_target_url,
+        "security_target_url": body.security_target_url or f"{project_base_url}/system/health",
         "security_artifact_id": body.security_artifact_id,
         "security_engine": body.security_engine,
     }

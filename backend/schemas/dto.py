@@ -195,16 +195,16 @@ class RunCreate(BaseModel):
     suite_id: int | None = None
     plan_id: int | None = None
     command_overrides: dict[str, str] | None = None
-    api_base_url: str = Field(default="http://127.0.0.1:8002", max_length=1024)
+    api_base_url: str | None = Field(default=None, max_length=1024)
     api_mode: str = Field(default="auto", description="auto|dsl|pytest")
     regression_set_id: int | None = None
     api_artifact_ids: list[int] | None = None
-    perf_base_url: str = Field(default="http://127.0.0.1:8002", max_length=1024)
+    perf_base_url: str | None = Field(default=None, max_length=1024)
     perf_mode: str = Field(default="auto", description="auto|k6|legacy")
     perf_artifact_id: int | None = None
     perf_distributed: bool | None = None
     security_mode: str = Field(default="auto", description="auto|ai|legacy|combined")
-    security_target_url: str = Field(default="http://127.0.0.1:8002/system/health", max_length=2048)
+    security_target_url: str | None = Field(default=None, max_length=2048)
     security_artifact_id: int | None = None
     security_engine: str = Field(default="builtin", description="builtin|nuclei|zap")
 

@@ -107,6 +107,26 @@ def test_start_run_enqueues_job_and_executes(mock_execute, client: TestClient, d
     mock_execute.assert_called_once()
 
 
+@patch("backend.services.orchestrator.execute_run")
+def test_start_run_defaults_targets_to_project_base_url(mock_execute, client: TestClient, db: Session, admin_headers: dict[str, str]):
+    project_id = create_test_project(
+        client,
+        admin_headers,
+        name="deployed-target",
+        code_root="https://sut.example.test",
+        repo_source="deployed",
+    )
+    res = client.post(f"/projects/{project_id}/runs", headers=admin_headers, json={"kinds": ["api"]})
+    assert res.status_code == 202, res.text
+    run_id = res.json()["id"]
+    job = db.query(ExecutionJob).filter(ExecutionJob.run_id == run_id).one()
+    process_job(db, job.id)
+    options = mock_execute.call_args.args[4]
+    assert options["api_base_url"] == "https://sut.example.test"
+    assert options["perf_base_url"] == "https://sut.example.test"
+    assert options["security_target_url"] == "https://sut.example.test/system/health"
+
+
 @patch("backend.services.orchestrator.execute_project_perf_k6")
 def test_start_run_perf_k6(mock_k6, client: TestClient, db: Session, admin_headers: dict[str, str]):
     mock_k6.return_value = {
