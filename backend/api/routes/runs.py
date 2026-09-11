@@ -6,7 +6,13 @@ from backend.api.deps import get_tenant_execution_job, get_tenant_project, get_t
 from backend.db.session import get_db
 from backend.models.entities import ExecutionJob, Project, TestRun, User
 from backend.schemas.dto import ExecutionJobOut, RunCreate, RunOut, RunTaskOut
-from backend.services.job_queue import cancel_run_job, enqueue_test_run_job, retry_run_job
+from backend.services.job_queue import (
+    cancel_run_job,
+    enqueue_test_run_job,
+    list_dead_letter_jobs,
+    requeue_dead_letter_job,
+    retry_run_job,
+)
 from backend.services.orchestrator import ALLOWED_KINDS, create_run_with_items
 from backend.services.audit_service import log_action
 from backend.services.plan_run_service import resolve_functional_case_ids
@@ -36,6 +42,9 @@ def _job_out(job: ExecutionJob | None) -> ExecutionJobOut | None:
         created_at=job.created_at,
         started_at=job.started_at,
         completed_at=job.completed_at,
+        next_retry_at=job.next_retry_at,
+        backoff_seconds=job.backoff_seconds,
+        dead_lettered_at=job.dead_lettered_at,
     )
 
 
@@ -258,3 +267,20 @@ def retry_run(job: ExecutionJob = Depends(get_tenant_execution_job), db: Session
         status = 404 if str(e) in {"execution job not found", "run not found"} else 409
         raise HTTPException(status_code=status, detail=str(e)) from e
     return _job_out(job)  # type: ignore[return-value]
+
+
+@router.get("/jobs/dead-letter", response_model=list[ExecutionJobOut], dependencies=[Depends(require_permission("run.read"))])
+def dead_letter_jobs(user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> list[ExecutionJobOut]:
+    jobs = list_dead_letter_jobs(db)
+    if is_platform_user(user):
+        return [_job_out(job) for job in jobs]  # type: ignore[misc]
+    allowed = {row[0] for row in filter_projects_for_user(db.query(Project.id), user).all()}
+    return [_job_out(job) for job in jobs if job.run and job.run.project_id in allowed]  # type: ignore[misc]
+
+
+@router.post("/jobs/{job_id}/dead-letter/requeue", response_model=ExecutionJobOut, dependencies=[Depends(require_permission("run.execute"))])
+def requeue_dead_letter(job_id: int, db: Session = Depends(get_db)) -> ExecutionJobOut:
+    try:
+        return _job_out(requeue_dead_letter_job(db, job_id))  # type: ignore[return-value]
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc

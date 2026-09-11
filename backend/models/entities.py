@@ -22,6 +22,7 @@ class JobStatus(str, enum.Enum):
     running = "running"
     completed = "completed"
     failed = "failed"
+    dead_lettered = "dead_lettered"
     cancelled = "cancelled"
 
 
@@ -253,6 +254,9 @@ class ExecutionJob(Base):
     payload: Mapped[dict | None] = mapped_column(JSON, default=None)
     attempt_count: Mapped[int] = mapped_column(default=0)
     max_attempts: Mapped[int] = mapped_column(default=3)
+    next_retry_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None, index=True)
+    backoff_seconds: Mapped[int] = mapped_column(Integer, nullable=False, default=30)
+    dead_lettered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
     cancel_requested: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     last_error: Mapped[str | None] = mapped_column(Text, default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -726,3 +730,14 @@ class ScheduledJobRun(Base):
     trigger: Mapped[str] = mapped_column(String(32), nullable=False, default="schedule")
 
     job: Mapped[ScheduledJob] = relationship(back_populates="runs")
+
+
+class SchedulerLease(Base):
+    """Database fallback lease used when Redis is unavailable."""
+
+    __tablename__ = "scheduler_leases"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    lease_key: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
+    owner_token: Mapped[str] = mapped_column(String(128), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)

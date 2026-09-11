@@ -6,7 +6,7 @@ import socket
 import threading
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session, selectinload
 
@@ -324,6 +324,7 @@ def claim_next_pending_job(db: Session, worker_id: str) -> ExecutionJob | None:
         .filter(
             ExecutionJob.status == JobStatus.pending.value,
             ExecutionJob.cancel_requested.is_(False),
+            (ExecutionJob.next_retry_at.is_(None) | (ExecutionJob.next_retry_at <= _now())),
         )
         .order_by(ExecutionJob.id.asc())
         .first()
@@ -391,8 +392,9 @@ def process_job(db: Session, job_id: int, *, auto_claim: bool = True) -> None:
             job.status = JobStatus.pending.value
             job.completed_at = None
             job.started_at = None
+            delay = max(1, int(job.backoff_seconds or 30)) * (2 ** max(0, job.attempt_count - 1))
+            job.next_retry_at = _now() + timedelta(seconds=min(delay, 86400))
             settings = get_settings()
-            _dispatch_queue(job.id)
             log_action(
                 db,
                 module="jobs",
@@ -402,11 +404,32 @@ def process_job(db: Session, job_id: int, *, auto_claim: bool = True) -> None:
                 detail={"run_id": run.id, "error": str(exc)},
             )
         else:
-            job.status = JobStatus.failed.value
+            job.status = JobStatus.dead_lettered.value
             job.completed_at = _now()
+            job.dead_lettered_at = job.completed_at
             _alert_job_failure(db, job, run, error=str(exc))
         _record_job_metric(job.status)
         db.commit()
+
+
+def list_dead_letter_jobs(db: Session, limit: int = 100) -> list[ExecutionJob]:
+    return db.query(ExecutionJob).filter(ExecutionJob.status == JobStatus.dead_lettered.value).order_by(ExecutionJob.id.desc()).limit(min(max(limit, 1), 200)).all()
+
+
+def requeue_dead_letter_job(db: Session, job_id: int) -> ExecutionJob:
+    job = db.query(ExecutionJob).filter(ExecutionJob.id == job_id, ExecutionJob.status == JobStatus.dead_lettered.value).one_or_none()
+    if not job:
+        raise ValueError("dead-letter job not found")
+    job.status = JobStatus.pending.value
+    job.attempt_count = 0
+    job.next_retry_at = None
+    job.dead_lettered_at = None
+    job.completed_at = None
+    job.started_at = None
+    job.cancel_requested = False
+    db.commit()
+    _dispatch_queue(job.id)
+    return job
 
 
 def _record_job_metric(status: str) -> None:

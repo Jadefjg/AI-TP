@@ -275,6 +275,9 @@ class ExecutionJobOut(BaseModel):
     created_at: datetime
     started_at: datetime | None
     completed_at: datetime | None
+    next_retry_at: datetime | None = None
+    backoff_seconds: int = 30
+    dead_lettered_at: datetime | None = None
     model_config = {"from_attributes": True}
 
 

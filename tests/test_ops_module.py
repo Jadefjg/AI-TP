@@ -51,6 +51,23 @@ def test_ops_schedule_whitelist_and_run(client: TestClient, admin_headers: dict)
     assert run.json()["status"] in {"completed", "failed", "skipped"}
 
 
+def test_ops_schedule_reenable_restores_next_run_at(client: TestClient, admin_headers: dict):
+    payload = {
+        "name": "ops-reenable-regression",
+        "handler_key": "ops.health_snapshot",
+        "interval_seconds": 3600,
+        "enabled": False,
+    }
+    created = client.post("/ops/schedule/jobs", headers=admin_headers, json=payload)
+    assert created.status_code == 200, created.text
+    assert created.json()["next_run_at"] is None
+
+    payload["enabled"] = True
+    enabled = client.post("/ops/schedule/jobs", headers=admin_headers, json=payload)
+    assert enabled.status_code == 200, enabled.text
+    assert enabled.json()["next_run_at"] is not None
+
+
 def test_setting_revision_and_rollback(client: TestClient, admin_headers: dict):
     key = "ops.test.rollback.flag"
     create = client.post(

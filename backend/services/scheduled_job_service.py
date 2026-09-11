@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from backend.db.session import SessionLocal
 from backend.models.entities import ScheduledJob, ScheduledJobRun
 from backend.services.audit_service import log_action, purge_audit_logs_older_than
+from backend.services.scheduler_lock import SchedulerLeaseLock
 
 logger = logging.getLogger(__name__)
 
@@ -131,13 +132,19 @@ def upsert_job(
     row = db.query(ScheduledJob).filter(ScheduledJob.name == name).one_or_none()
     now = _now()
     if row:
+        was_enabled = bool(row.enabled)
         row.handler_key = handler_key
         row.description = description
         row.interval_seconds = interval_seconds
         row.enabled = enabled
         row.params = params
-        if enabled and (row.next_run_at is None or not row.enabled):
+        # Re-enabling a job must always establish a future schedule. Without
+        # this, jobs disabled before their first run can remain enabled with
+        # a null `next_run_at` and never be picked up by the scheduler.
+        if enabled and (not was_enabled or row.next_run_at is None):
             row.next_run_at = now + timedelta(seconds=interval_seconds)
+        elif not enabled:
+            row.next_run_at = None
     else:
         row = ScheduledJob(
             name=name,
@@ -238,6 +245,9 @@ def run_job(db: Session, job_id: int, *, trigger: str = "manual") -> ScheduledJo
 
 
 def tick_due_jobs() -> int:
+    lease = SchedulerLeaseLock()
+    if not lease.acquire():
+        return 0
     session = SessionLocal()
     ran = 0
     try:
@@ -261,6 +271,7 @@ def tick_due_jobs() -> int:
         return ran
     finally:
         session.close()
+        lease.release()
 
 
 def _scheduler_loop() -> None:
