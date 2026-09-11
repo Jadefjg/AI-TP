@@ -199,6 +199,35 @@ def test_cancel_pending_run(client: TestClient, admin_headers: dict[str, str]):
     assert run.json()["status"] == "cancelled"
 
 
+def test_cancel_completed_run_returns_conflict(client: TestClient, db: Session, admin_headers: dict[str, str]):
+    project_id = _create_project(client, admin_headers)
+    res = client.post(f"/projects/{project_id}/runs", headers=admin_headers, json={"kinds": ["unit"]})
+    run_id = res.json()["id"]
+    job = db.query(ExecutionJob).filter(ExecutionJob.run_id == run_id).one()
+    job.status = "completed"
+    db.commit()
+    cancelled = client.post(f"/runs/{run_id}/cancel", headers=admin_headers)
+    assert cancelled.status_code == 409
+
+
+def test_retry_pending_run_returns_conflict(client: TestClient, admin_headers: dict[str, str]):
+    project_id = _create_project(client, admin_headers)
+    res = client.post(f"/projects/{project_id}/runs", headers=admin_headers, json={"kinds": ["unit"]})
+    retry = client.post(f"/runs/{res.json()['id']}/retry", headers=admin_headers)
+    assert retry.status_code == 409
+
+
+def test_start_run_rejects_invalid_execution_modes(client: TestClient, admin_headers: dict[str, str]):
+    project_id = _create_project(client, admin_headers)
+    res = client.post(
+        f"/projects/{project_id}/runs",
+        headers=admin_headers,
+        json={"kinds": ["api"], "api_mode": "dls"},
+    )
+    assert res.status_code == 400
+    assert "api_mode" in res.json()["detail"]
+
+
 def test_report_html_and_email_feedback(client: TestClient, db: Session, admin_headers: dict[str, str]):
     project_id = _create_project(client, admin_headers)
     res = client.post(f"/projects/{project_id}/runs", headers=admin_headers, json={"kinds": ["unit"]})

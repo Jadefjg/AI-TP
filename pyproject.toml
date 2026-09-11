@@ -40,6 +40,9 @@ observability = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+filterwarnings = [
+  "ignore:Using `httpx` with `starlette.testclient` is deprecated:DeprecationWarning",
+]
 
 [tool.ruff]
 line-length = 100

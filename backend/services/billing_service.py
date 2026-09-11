@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 
 from fastapi import HTTPException
 from fpdf import FPDF
+from fpdf.enums import XPos, YPos
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -107,18 +108,18 @@ def build_invoice_pdf(invoice: BillingInvoice, org: Organization) -> bytes:
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Helvetica", size=14)
-    pdf.cell(0, 10, "AI-TP Usage Invoice", ln=True)
+    pdf.cell(0, 10, "AI-TP Usage Invoice", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
     pdf.set_font("Helvetica", size=11)
-    pdf.cell(0, 8, f"Organization: {_pdf_text(org.name)} ({org.slug})", ln=True)
-    pdf.cell(0, 8, f"Period: {invoice.period}", ln=True)
-    pdf.cell(0, 8, f"Invoice ID: {invoice.id}", ln=True)
-    pdf.cell(0, 8, f"Status: {invoice.status}", ln=True)
-    pdf.cell(0, 8, f"Token usage: {invoice.token_usage:,}", ln=True)
-    pdf.cell(0, 8, f"Amount: {invoice.amount_cents / 100:.2f} {invoice.currency.upper()}", ln=True)
+    pdf.cell(0, 8, f"Organization: {_pdf_text(org.name)} ({org.slug})", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    pdf.cell(0, 8, f"Period: {invoice.period}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    pdf.cell(0, 8, f"Invoice ID: {invoice.id}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    pdf.cell(0, 8, f"Status: {invoice.status}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    pdf.cell(0, 8, f"Token usage: {invoice.token_usage:,}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    pdf.cell(0, 8, f"Amount: {invoice.amount_cents / 100:.2f} {invoice.currency.upper()}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
     if invoice.paid_at:
-        pdf.cell(0, 8, f"Paid at: {invoice.paid_at.isoformat()}", ln=True)
+        pdf.cell(0, 8, f"Paid at: {invoice.paid_at.isoformat()}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
     if invoice.stripe_invoice_id:
-        pdf.cell(0, 8, f"Stripe Invoice: {invoice.stripe_invoice_id}", ln=True)
+        pdf.cell(0, 8, f"Stripe Invoice: {invoice.stripe_invoice_id}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
     raw = pdf.output()
     if isinstance(raw, bytearray):
         return bytes(raw)

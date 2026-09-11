@@ -211,6 +211,8 @@ def cancel_run_job(db: Session, run_id: int) -> ExecutionJob:
     )
     if not run:
         raise ValueError("run not found")
+    if job.status in {JobStatus.completed.value, JobStatus.failed.value, JobStatus.cancelled.value}:
+        raise ValueError(f"run cannot be cancelled when job status is {job.status}")
 
     job.cancel_requested = True
     if job.status in {JobStatus.pending.value}:
@@ -253,6 +255,8 @@ def retry_run_job(db: Session, run_id: int) -> ExecutionJob:
     )
     if not run:
         raise ValueError("run not found")
+    if job.status in {JobStatus.pending.value, JobStatus.running.value}:
+        raise ValueError(f"run cannot be retried while job status is {job.status}")
 
     job.status = JobStatus.pending.value
     job.cancel_requested = False

@@ -1,4 +1,5 @@
 import logging
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, Response
@@ -38,8 +39,43 @@ from backend.services.job_queue import recover_stale_execution_jobs, start_job_w
 
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="AI 测试平台", version=APP_VERSION)
 app_settings = get_settings()
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    """Initialize schema, recovery, and optional background services once."""
+    Path("data").mkdir(parents=True, exist_ok=True)
+    bootstrap_schema()
+    try:
+        recovered = recover_stale_execution_jobs()
+        if recovered:
+            logger.warning("recovered %s stale execution job(s) on startup", recovered)
+    except Exception:  # noqa: BLE001
+        logger.exception("stale job recovery failed")
+    backend = (app_settings.job_queue_backend or "db").strip().lower()
+    if app_settings.job_worker_enabled and app_settings.job_worker_in_api:
+        if backend in {"rq", "celery"}:
+            logger.info("embedded job worker disabled for JOB_QUEUE_BACKEND=%s; run dedicated worker process", backend)
+        else:
+            start_job_worker()
+    try:
+        from backend.services.dictionary_service import seed_builtin_dictionaries
+        from backend.services.scheduled_job_service import seed_default_scheduled_jobs, start_ops_scheduler
+        from backend.db.session import SessionLocal
+        seed_db = SessionLocal()
+        try:
+            seed_builtin_dictionaries(seed_db)
+            seed_default_scheduled_jobs(seed_db)
+        finally:
+            seed_db.close()
+        start_ops_scheduler()
+    except Exception:  # noqa: BLE001
+        logger.exception("ops scheduler/dictionary seed failed")
+    yield
+
+
+app = FastAPI(title="AI 测试平台", version=APP_VERSION, lifespan=lifespan)
 
 if app_settings.metrics_enabled:
     from backend.core.tracing import PrometheusMiddleware, RequestTracingMiddleware
@@ -96,41 +132,6 @@ except Exception:  # noqa: BLE001
 
 if _instrumentor_cls is not None:
     _instrumentor_cls().instrument_app(app)
-
-
-@app.on_event("startup")
-def _startup() -> None:
-    Path("data").mkdir(parents=True, exist_ok=True)
-    bootstrap_schema()
-    try:
-        recovered = recover_stale_execution_jobs()
-        if recovered:
-            logger.warning("recovered %s stale execution job(s) on startup", recovered)
-    except Exception:  # noqa: BLE001
-        logger.exception("stale job recovery failed")
-    backend = (app_settings.job_queue_backend or "db").strip().lower()
-    if app_settings.job_worker_enabled and app_settings.job_worker_in_api:
-        if backend in {"rq", "celery"}:
-            logger.info(
-                "embedded job worker disabled for JOB_QUEUE_BACKEND=%s; run dedicated worker process",
-                backend,
-            )
-        else:
-            start_job_worker()
-    try:
-        from backend.services.dictionary_service import seed_builtin_dictionaries
-        from backend.services.scheduled_job_service import seed_default_scheduled_jobs, start_ops_scheduler
-        from backend.db.session import SessionLocal
-
-        seed_db = SessionLocal()
-        try:
-            seed_builtin_dictionaries(seed_db)
-            seed_default_scheduled_jobs(seed_db)
-        finally:
-            seed_db.close()
-        start_ops_scheduler()
-    except Exception:  # noqa: BLE001
-        logger.exception("ops scheduler/dictionary seed failed")
 
 
 @app.get("/")

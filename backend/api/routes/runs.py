@@ -15,6 +15,11 @@ from backend.services.project_base_url import resolve_project_base_url
 
 router = APIRouter(tags=["runs"])
 
+_API_MODES = {"auto", "dsl", "pytest"}
+_PERF_MODES = {"auto", "k6", "legacy"}
+_SECURITY_MODES = {"auto", "ai", "legacy", "combined"}
+_SECURITY_ENGINES = {"builtin", "nuclei", "zap"}
+
 
 def _job_out(job: ExecutionJob | None) -> ExecutionJobOut | None:
     if not job:
@@ -47,6 +52,15 @@ def start_run(
 ) -> TestRun:
     if body.suite_id is not None and body.plan_id is not None:
         raise HTTPException(status_code=400, detail="suite_id and plan_id are mutually exclusive")
+    invalid_modes = (
+        ("api_mode", body.api_mode, _API_MODES),
+        ("perf_mode", body.perf_mode, _PERF_MODES),
+        ("security_mode", body.security_mode, _SECURITY_MODES),
+        ("security_engine", body.security_engine, _SECURITY_ENGINES),
+    )
+    for name, value, allowed in invalid_modes:
+        if value not in allowed:
+            raise HTTPException(status_code=400, detail=f"invalid {name}: {value}")
 
     try:
         functional_case_ids = resolve_functional_case_ids(
@@ -227,7 +241,8 @@ def cancel_run(job: ExecutionJob = Depends(get_tenant_execution_job), db: Sessio
     try:
         job = cancel_run_job(db, job.run_id)
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e)) from e
+        status = 404 if str(e) in {"execution job not found", "run not found"} else 409
+        raise HTTPException(status_code=status, detail=str(e)) from e
     return _job_out(job)  # type: ignore[return-value]
 
 
@@ -240,5 +255,6 @@ def retry_run(job: ExecutionJob = Depends(get_tenant_execution_job), db: Session
     try:
         job = retry_run_job(db, job.run_id)
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e)) from e
+        status = 404 if str(e) in {"execution job not found", "run not found"} else 409
+        raise HTTPException(status_code=status, detail=str(e)) from e
     return _job_out(job)  # type: ignore[return-value]
