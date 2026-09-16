@@ -7,6 +7,7 @@ from backend.services.agents.perf_agent import PerfAgent
 from backend.services.agents.requirement_agent import RequirementAgent
 from backend.services.agents.security_agent import SecurityAgent
 from backend.services.agents.ui_agent import UiAgent
+from backend.services.agents.protocol import BusinessAgent, normalize_result
 
 requirement_agent = RequirementAgent()
 ui_agent = UiAgent()
@@ -35,6 +36,7 @@ def list_agent_manifests() -> list[AgentManifest]:
 
 
 __all__ = [
+    "BusinessAgent",
     "get_agent",
     "interface_agent",
     "list_agent_manifests",
@@ -42,4 +44,5 @@ __all__ = [
     "requirement_agent",
     "security_agent",
     "ui_agent",
+    "normalize_result",
 ]

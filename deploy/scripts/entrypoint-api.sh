@@ -37,17 +37,8 @@ except Exception as exc:
 PY
 
 if [ "${RUN_MIGRATIONS:-true}" = "true" ]; then
-  # Alembic revisions assume core ORM tables exist (projects, users, …).
-  # Autogen revision 8fc22864ffb9 only adds a few tables; create_all fills the base schema.
-  echo "[api] ensuring base schema (create_all)"
-  python - <<'PY'
-from backend.db.session import Base, engine
-from backend.models import entities  # noqa: F401 — register ORM tables on Base.metadata
-Base.metadata.create_all(bind=engine)
-print("[api] create_all done")
-PY
-  echo "[api] alembic upgrade head"
-  alembic upgrade head
+  echo "[api] ensuring schema (base bootstrap + alembic)"
+  bash scripts/migrate.sh
 fi
 
 echo "[api] starting uvicorn on 0.0.0.0:8002"

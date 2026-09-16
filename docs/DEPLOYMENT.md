@@ -272,7 +272,7 @@ cp deploy/.env.docker.aliyun.example deploy/.env.docker
 | 动作 | 建议 |
 |------|------|
 | 发版 | tag → CI 构建前端 + 测后端 → 滚动更新 API/Worker |
-| 迁移 | 发版前 `alembic upgrade head`；`SCHEMA_BOOTSTRAP_MODE=alembic` |
+| 迁移 | 发版前先确保 ORM 基础表存在（空库执行 `Base.metadata.create_all`），再 `alembic upgrade head`；`SCHEMA_BOOTSTRAP_MODE=alembic` |
 | 回滚 | 保留上一版镜像/目录；DB 回滚需有备份，慎用 downgrade |
 | 日志 | journald / 文件 + 请求头 `X-Request-ID` |
 | 监控 | Prometheus 抓 `/metrics`；可选 OTLP |

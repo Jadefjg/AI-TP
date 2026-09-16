@@ -3,7 +3,7 @@ from __future__ import annotations
 import enum
 from datetime import datetime
 
-from sqlalchemy import JSON, Boolean, Column, DateTime, ForeignKey, Integer, String, Table, Text, func
+from sqlalchemy import JSON, Boolean, Column, DateTime, ForeignKey, Integer, String, Table, Text, func, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.db.session import Base
@@ -287,6 +287,40 @@ class AiAsyncJob(Base):
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
 
     project: Mapped[Project] = relationship(back_populates="ai_async_jobs")
+
+
+class AgentWorkflowRun(Base):
+    __tablename__ = "agent_workflow_runs"
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="pending")
+    current_step: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    detail: Mapped[dict | None] = mapped_column(JSON, default=None)
+    input_payload: Mapped[dict | None] = mapped_column(JSON, default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    steps: Mapped[list[AgentWorkflowStep]] = relationship(back_populates="workflow", cascade="all, delete-orphan")
+
+
+class AgentWorkflowStep(Base):
+    __tablename__ = "agent_workflow_steps"
+    __table_args__ = (UniqueConstraint("workflow_id", "position", name="uq_agent_workflow_step_position"), UniqueConstraint("ai_job_id", name="uq_agent_workflow_step_ai_job"))
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    workflow_id: Mapped[int] = mapped_column(ForeignKey("agent_workflow_runs.id"), nullable=False, index=True)
+    agent_key: Mapped[str] = mapped_column(String(64), nullable=False)
+    step_name: Mapped[str] = mapped_column(String(128), nullable=False)
+    position: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="pending")
+    review_status: Mapped[str] = mapped_column(String(32), nullable=False, default="not_required")
+    artifact_id: Mapped[int | None] = mapped_column(ForeignKey("ai_artifacts.id"), default=None)
+    output_type: Mapped[str | None] = mapped_column(String(64), default=None)
+    output_id: Mapped[int | None] = mapped_column(Integer, default=None)
+    ai_job_id: Mapped[int | None] = mapped_column(ForeignKey("ai_async_jobs.id"), default=None)
+    attempt_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    max_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=3)
+    trace: Mapped[list | None] = mapped_column(JSON, default=list)
+    detail: Mapped[dict | None] = mapped_column(JSON, default=None)
+    workflow: Mapped[AgentWorkflowRun] = relationship(back_populates="steps")
 
 
 class TestRunItem(Base):

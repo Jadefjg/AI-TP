@@ -21,6 +21,7 @@ from backend.models.entities import (
     RequirementReview,
     SecurityScanJob,
     User,
+    AgentWorkflowRun, AgentWorkflowStep,
 )
 from backend.schemas.dto import (
     AiArtifactOut,
@@ -105,6 +106,102 @@ from backend.services.requirement_review_service import diff_requirement_reviews
 from backend.services.tenant_service import get_project_for_user
 
 router = APIRouter(tags=["ai"])
+
+
+@router.post("/projects/{project_id}/agent-workflows", dependencies=[Depends(require_permission("ai.execute"))])
+def create_agent_workflow(body: dict | None = None, project: Project = Depends(get_tenant_project), db: Session = Depends(get_db)):
+    from backend.services.agent_workflow_orchestrator import DEFAULT_PIPELINE
+    payload = body or {}
+    if not str(payload.get("requirement_text") or "").strip():
+        raise HTTPException(400, "requirement_text is required")
+    run = AgentWorkflowRun(project_id=project.id, status="pending", input_payload=payload)
+    db.add(run); db.flush()
+    run.steps = [AgentWorkflowStep(agent_key=k, step_name=m, position=i) for i, (k, m) in enumerate(DEFAULT_PIPELINE)]
+    db.commit(); db.refresh(run)
+    first = run.steps[0]
+    from backend.services.ai_job_queue import enqueue_ai_job
+    try:
+        job = enqueue_ai_job(db, project=project, module_type=first.step_name, request_payload={**payload, "workflow_step_id": first.id})
+        first.ai_job_id = job.id
+        first.status = "running"
+        run.status = "running"
+    except Exception:
+        db.rollback()
+        raise
+    db.commit(); db.refresh(run)
+    return _workflow_payload(run)
+
+
+def _workflow_payload(run):
+    return {"id": run.id, "project_id": run.project_id, "status": run.status, "current_step": run.current_step,
+            "input_payload": run.input_payload or {}, "steps": [{"id": s.id, "agent_key": s.agent_key, "step_name": s.step_name, "position": s.position,
+                        "status": s.status, "review_status": s.review_status, "artifact_id": s.artifact_id,
+                        "ai_job_id": s.ai_job_id, "attempt_count": s.attempt_count, "max_attempts": s.max_attempts,
+                        "trace": s.trace or [], "detail": s.detail or {}} for s in sorted(run.steps, key=lambda x: x.position)]}
+
+
+@router.get("/projects/{project_id}/agent-workflows/{workflow_id}", dependencies=[Depends(require_permission("ai.read"))])
+def get_agent_workflow(workflow_id: int, project: Project = Depends(get_tenant_project), db: Session = Depends(get_db)):
+    run = db.query(AgentWorkflowRun).filter_by(id=workflow_id, project_id=project.id).one_or_none()
+    if not run: raise HTTPException(404, "agent workflow not found")
+    return _workflow_payload(run)
+
+
+@router.post("/projects/{project_id}/agent-workflows/{workflow_id}/steps/{step_id}/review", dependencies=[Depends(require_permission("ai.execute"))])
+def review_agent_workflow_step(workflow_id: int, step_id: int, body: dict, project: Project = Depends(get_tenant_project), db: Session = Depends(get_db)):
+    step = db.query(AgentWorkflowStep).join(AgentWorkflowRun).filter(AgentWorkflowStep.id == step_id, AgentWorkflowRun.id == workflow_id, AgentWorkflowRun.project_id == project.id).one_or_none()
+    if not step: raise HTTPException(404, "workflow step not found")
+    if step.status != "completed" or step.review_status != "pending_review":
+        raise HTTPException(409, "step is not awaiting review")
+    status = body.get("status")
+    if status not in {"approved", "rejected"}: raise HTTPException(400, "review status must be approved or rejected")
+    from datetime import datetime, timezone
+    step.review_status = status; step.detail = {**(step.detail or {}), "review_note": body.get("note", ""), "reviewed_at": datetime.now(timezone.utc).isoformat()}
+    if status == "approved":
+        from backend.services.ai_job_queue import enqueue_ai_job
+        nxt = db.query(AgentWorkflowStep).filter(AgentWorkflowStep.workflow_id == workflow_id, AgentWorkflowStep.position > step.position).order_by(AgentWorkflowStep.position.asc()).first()
+        if nxt and not nxt.ai_job_id:
+            from backend.services.agents.artifact_adapters import build_validated_handoff
+            prior = step.detail.get("result") if isinstance(step.detail, dict) else {}
+            handoff = build_validated_handoff(nxt.step_name, run_input=dict(step.workflow.input_payload or {}), result=prior if isinstance(prior, dict) else {})
+            base = handoff["input"]
+            nxt.detail = {**(nxt.detail or {}), "handoff": handoff}
+            job = enqueue_ai_job(db, project=project, module_type=nxt.step_name, request_payload={**base, "workflow_step_id": nxt.id})
+            nxt.ai_job_id, nxt.status = job.id, "running"
+            step.workflow.status, step.workflow.current_step = "running", nxt.position
+    db.commit(); db.refresh(step)
+    return _workflow_payload(step.workflow)
+
+
+@router.post("/projects/{project_id}/agent-workflows/{workflow_id}/steps/{step_id}/retry", dependencies=[Depends(require_permission("ai.execute"))])
+def retry_agent_workflow_step(workflow_id: int, step_id: int, project: Project = Depends(get_tenant_project), db: Session = Depends(get_db)):
+    step = db.query(AgentWorkflowStep).join(AgentWorkflowRun).filter(AgentWorkflowStep.id == step_id, AgentWorkflowRun.id == workflow_id, AgentWorkflowRun.project_id == project.id).one_or_none()
+    if not step: raise HTTPException(404, "workflow step not found")
+    if step.status not in {"failed", "skipped"}:
+        raise HTTPException(409, "only failed or skipped steps can be retried")
+    if step.attempt_count >= step.max_attempts: raise HTTPException(409, "retry limit reached")
+    step.status, step.attempt_count = "pending", step.attempt_count + 1
+    from backend.services.ai_job_queue import enqueue_ai_job
+    payload = dict(step.workflow.input_payload or {})
+    job = enqueue_ai_job(db, project=project, module_type=step.step_name, request_payload={**payload, "workflow_step_id": step.id})
+    step.ai_job_id = job.id
+    db.commit(); db.refresh(step)
+    return _workflow_payload(step.workflow)
+
+
+@router.post("/projects/{project_id}/agent-workflows/{workflow_id}/steps/{step_id}/preview-handoff", dependencies=[Depends(require_permission("ai.read"))])
+def preview_agent_handoff(workflow_id: int, step_id: int, project: Project = Depends(get_tenant_project), db: Session = Depends(get_db)):
+    step = db.query(AgentWorkflowStep).join(AgentWorkflowRun).filter(AgentWorkflowStep.id == step_id, AgentWorkflowRun.id == workflow_id, AgentWorkflowRun.project_id == project.id).one_or_none()
+    if not step: raise HTTPException(404, "workflow step not found")
+    nxt = db.query(AgentWorkflowStep).filter(AgentWorkflowStep.workflow_id == workflow_id, AgentWorkflowStep.position > step.position).order_by(AgentWorkflowStep.position.asc()).first()
+    if not nxt: return {"next": None}
+    from backend.services.agents.artifact_adapters import build_validated_handoff
+    prior = step.detail.get("result") if isinstance(step.detail, dict) else {}
+    try:
+        handoff = build_validated_handoff(nxt.step_name, run_input=dict(step.workflow.input_payload or {}), result=prior or {})
+    except (ValueError, TypeError) as exc:
+        raise HTTPException(422, str(exc)) from exc
+    return {"next_step_id": nxt.id, "next_module": nxt.step_name, "handoff": handoff}
 
 
 def _project_api_context(project: Project) -> str:

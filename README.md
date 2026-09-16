@@ -120,7 +120,8 @@ JOB_QUEUE_BACKEND=celery REDIS_URL=redis://127.0.0.1:6379/0 \
 **数据库迁移（推荐新环境）**
 
 ```bash
-alembic upgrade head
+# 历史 revisions 以 ORM 基础表为前提；统一使用迁移入口（幂等）
+bash scripts/migrate.sh
 SCHEMA_BOOTSTRAP_MODE=alembic   # 启动时仅 seed，不再 create_all/ALTER 补丁
 ```
 

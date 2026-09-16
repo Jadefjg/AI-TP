@@ -323,11 +323,28 @@ def process_ai_job(db: Session, job_id: int, *, auto_claim: bool = True) -> None
         else:
             job.result_payload = result_payload
             job.status = JobStatus.completed.value
+            # Advance an optional persisted Agent workflow step.
+            workflow_step_id = (job.request_payload or {}).get("workflow_step_id") if isinstance(job.request_payload, dict) else None
+            if workflow_step_id:
+                from backend.services.agent_workflow_progression import progress_after_step
+                progress_after_step(db, project=project, step_id=workflow_step_id, result=result_payload)
+                db.commit()
+                job.completed_at = _now()
+                return
         job.completed_at = _now()
         db.commit()
     except Exception as exc:  # noqa: BLE001
         db.rollback()
         job = db.query(AiAsyncJob).filter(AiAsyncJob.id == job_id).one()
+        workflow_step_id = (job.request_payload or {}).get("workflow_step_id") if isinstance(job.request_payload, dict) else None
+        if workflow_step_id:
+            from backend.models.entities import AgentWorkflowStep, AgentWorkflowRun
+            step = db.query(AgentWorkflowStep).filter_by(id=workflow_step_id).one_or_none()
+            if step:
+                step.status = "failed" if job.attempt_count >= job.max_attempts else "pending"
+                step.detail = {**(step.detail or {}), "error": str(exc)}
+                run = db.query(AgentWorkflowRun).filter_by(id=step.workflow_id).one_or_none()
+                if run and step.status == "failed": run.status = "failed"
         job.last_error = str(exc)
         if job.attempt_count < job.max_attempts and not job.cancel_requested:
             job.status = JobStatus.pending.value
