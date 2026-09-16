@@ -42,7 +42,10 @@ const navEntries: Array<NavLeaf | NavGroup> = [
     label: "智能流水",
     children: [
       { to: "/requirements", label: "01 需求 Agent", permission: "ai.read" },
-      { to: "/cases", label: "02 Case Agent", permission: "case.read" },
+      // Case Agent is part of the AI pipeline; use the same capability gate as
+      // the neighboring agents so it is not hidden for AI operators that do
+      // not have the separate case.read permission.
+      { to: "/cases", label: "02 Case Agent", permission: "ai.read" },
       { to: "/ui-management", label: "03 UI Agent", permission: "ai.read" },
       { to: "/interface-management", label: "04 接口 Agent", permission: "ai.read" },
       { to: "/perf-management", label: "05 性能 Agent", permission: "ai.read" },

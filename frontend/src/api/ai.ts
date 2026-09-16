@@ -412,7 +412,8 @@ export const workbenchApi = {
 };
 
 export const agentWorkflowApi = {
-  create: (projectId: number) => req<Record<string, unknown>>(`/projects/${projectId}/agent-workflows`, { method: "POST" }),
+  create: (projectId: number, body: { requirement_text: string; [key: string]: unknown }) => req<Record<string, unknown>>(`/projects/${projectId}/agent-workflows`, { method: "POST", body: JSON.stringify(body) }),
+  list: (projectId: number) => req<Array<Record<string, any>>>(`/projects/${projectId}/agent-workflows`),
   get: (projectId: number, workflowId: number) => req<Record<string, any>>(`/projects/${projectId}/agent-workflows/${workflowId}`),
   review: (projectId: number, workflowId: number, stepId: number, status: string, note = "") =>
     req<Record<string, unknown>>(`/projects/${projectId}/agent-workflows/${workflowId}/steps/${stepId}/review`, { method: "POST", body: JSON.stringify({ status, note }) }),

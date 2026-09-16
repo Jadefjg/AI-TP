@@ -24,8 +24,20 @@ const chatInput = ref("");
 const useRag = ref(true);
 const applyResult = ref<Record<string, unknown> | null>(null);
 const workflow = ref<any>(null);
-const startWorkflow = () => store.wrap(async () => { workflow.value = await agentWorkflowApi.create(projectId.value); });
-const reviewStep = (step: any, status: string) => store.wrap(async () => { workflow.value = await agentWorkflowApi.review(projectId.value, workflow.value.id, step.id, status); });
+const requirementText = ref("");
+const reviewNote = ref("");
+const workflows = ref<any[]>([]);
+const startWorkflow = () => store.wrap(async () => {
+  if (!requirementText.value.trim()) return;
+  workflow.value = await agentWorkflowApi.create(projectId.value, { requirement_text: requirementText.value.trim() });
+  workflows.value = [workflow.value, ...workflows.value.filter((item) => item.id !== workflow.value.id)];
+});
+const loadWorkflows = () => store.wrap(async () => {
+  workflows.value = await agentWorkflowApi.list(projectId.value);
+  if (!workflow.value && workflows.value.length) workflow.value = workflows.value[0];
+});
+const selectWorkflow = (item: any) => store.wrap(async () => { workflow.value = await agentWorkflowApi.get(projectId.value, item.id); });
+const reviewStep = (step: any, status: string) => store.wrap(async () => { workflow.value = await agentWorkflowApi.review(projectId.value, workflow.value.id, step.id, status, reviewNote.value); reviewNote.value = ""; });
 const retryStep = (step: any) => store.wrap(async () => { workflow.value = await agentWorkflowApi.retry(projectId.value, workflow.value.id, step.id); });
 const previewStep = (step: any) => store.wrap(async () => { step.handoffPreview = await agentWorkflowApi.preview(projectId.value, workflow.value.id, step.id); });
 
@@ -79,6 +91,7 @@ const applySession = () =>
 
 onMounted(() => {
   void loadSessions();
+  void loadWorkflows();
 });
 </script>
 
@@ -124,10 +137,19 @@ onMounted(() => {
     </a-col>
     <a-col :span="18">
       <a-card title="Agent 工作流" size="small" style="margin-bottom: 16px">
-        <a-button type="primary" @click="startWorkflow">启动五 Agent 流程</a-button>
+        <a-space direction="vertical" fill>
+          <a-textarea v-model="requirementText" :auto-size="{ minRows: 2, maxRows: 5 }" placeholder="输入需求后启动 Agent 工作流" />
+          <a-space>
+            <a-button type="primary" :disabled="!requirementText.trim()" @click="startWorkflow">启动五 Agent 流程</a-button>
+            <a-input v-if="workflow" v-model="reviewNote" placeholder="审核备注（可选）" style="width: 220px" />
+            <a-select v-if="workflows.length" :model-value="workflow?.id" placeholder="历史工作流" style="width: 220px" @change="(id: number) => selectWorkflow(workflows.find((item) => item.id === id))">
+              <a-option v-for="item in workflows" :key="item.id" :value="item.id">#{{ item.id }} · {{ item.status }}</a-option>
+            </a-select>
+          </a-space>
+        </a-space>
         <a-steps v-if="workflow" :current="workflow.current_step" style="margin-top: 16px">
           <a-step v-for="step in workflow.steps" :key="step.id" :title="step.agent_key" :description="`${step.status} · ${step.review_status}`">
-            <template #description><span>{{ step.status }} · {{ step.review_status }}</span><a-button size="mini" @click="previewStep(step)">预览交接</a-button><a-button v-if="step.review_status === 'pending_review'" size="mini" @click="reviewStep(step, 'approved')">通过</a-button><a-button v-if="step.status === 'failed' || step.status === 'pending'" size="mini" status="warning" @click="retryStep(step)">重试</a-button><pre v-if="step.handoffPreview" style="max-width: 280px; white-space: pre-wrap">{{ JSON.stringify(step.handoffPreview, null, 2) }}</pre></template>
+            <template #description><span>{{ step.status }} · {{ step.review_status }}</span><a-button size="mini" @click="previewStep(step)">预览交接</a-button><a-button v-if="step.review_status === 'pending_review'" size="mini" type="primary" @click="reviewStep(step, 'approved')">通过</a-button><a-button v-if="step.review_status === 'pending_review'" size="mini" status="danger" @click="reviewStep(step, 'rejected')">驳回</a-button><a-button v-if="step.status === 'failed' || step.status === 'pending'" size="mini" status="warning" @click="retryStep(step)">重试</a-button><pre v-if="step.handoffPreview" style="max-width: 280px; white-space: pre-wrap">{{ JSON.stringify(step.handoffPreview, null, 2) }}</pre></template>
           </a-step>
         </a-steps>
       </a-card>

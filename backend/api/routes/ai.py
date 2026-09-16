@@ -56,6 +56,11 @@ from backend.schemas.dto import (
     ReviewConvertCasesOut,
     SecurityScanAiIn,
 )
+from pydantic import BaseModel
+
+class AgentWorkflowReviewIn(BaseModel):
+    status: str
+    note: str | None = None
 from backend.services.ai.constants import (
     MODULE_API_AUTOMATION,
     MODULE_FUNCTIONAL_CASES,
@@ -132,6 +137,14 @@ def create_agent_workflow(body: dict | None = None, project: Project = Depends(g
     return _workflow_payload(run)
 
 
+@router.get("/projects/{project_id}/agent-workflows", dependencies=[Depends(require_permission("ai.read"))])
+def list_agent_workflows(project: Project = Depends(get_tenant_project), db: Session = Depends(get_db)):
+    runs = (db.query(AgentWorkflowRun)
+            .filter(AgentWorkflowRun.project_id == project.id)
+            .order_by(AgentWorkflowRun.id.desc()).limit(50).all())
+    return [_workflow_payload(run) for run in runs]
+
+
 def _workflow_payload(run):
     return {"id": run.id, "project_id": run.project_id, "status": run.status, "current_step": run.current_step,
             "input_payload": run.input_payload or {}, "steps": [{"id": s.id, "agent_key": s.agent_key, "step_name": s.step_name, "position": s.position,
@@ -148,15 +161,24 @@ def get_agent_workflow(workflow_id: int, project: Project = Depends(get_tenant_p
 
 
 @router.post("/projects/{project_id}/agent-workflows/{workflow_id}/steps/{step_id}/review", dependencies=[Depends(require_permission("ai.execute"))])
-def review_agent_workflow_step(workflow_id: int, step_id: int, body: dict, project: Project = Depends(get_tenant_project), db: Session = Depends(get_db)):
+def review_agent_workflow_step(workflow_id: int, step_id: int, body: AgentWorkflowReviewIn, project: Project = Depends(get_tenant_project), db: Session = Depends(get_db)):
     step = db.query(AgentWorkflowStep).join(AgentWorkflowRun).filter(AgentWorkflowStep.id == step_id, AgentWorkflowRun.id == workflow_id, AgentWorkflowRun.project_id == project.id).one_or_none()
     if not step: raise HTTPException(404, "workflow step not found")
     if step.status != "completed" or step.review_status != "pending_review":
         raise HTTPException(409, "step is not awaiting review")
-    status = body.get("status")
+    status = body.status
     if status not in {"approved", "rejected"}: raise HTTPException(400, "review status must be approved or rejected")
     from datetime import datetime, timezone
-    step.review_status = status; step.detail = {**(step.detail or {}), "review_note": body.get("note", ""), "reviewed_at": datetime.now(timezone.utc).isoformat()}
+    reviewed_at = datetime.now(timezone.utc).isoformat()
+    step.review_status = status
+    step.detail = {**(step.detail or {}), "review_note": body.note or "", "reviewed_at": reviewed_at}
+    run = step.workflow
+    run.detail = {**(run.detail or {}), "last_review": {"step_id": step.id, "status": status, "note": body.note or "", "reviewed_at": reviewed_at}}
+    if status == "rejected":
+        run.status = "rejected"
+        log_action(db, module="ai", action="workflow.step.rejected", level="warning",
+                   message=f"workflow #{workflow_id} step #{step_id} rejected",
+                   detail={"workflow_id": workflow_id, "step_id": step_id, "note": body.note or ""}, project_id=project.id)
     if status == "approved":
         from backend.services.ai_job_queue import enqueue_ai_job
         nxt = db.query(AgentWorkflowStep).filter(AgentWorkflowStep.workflow_id == workflow_id, AgentWorkflowStep.position > step.position).order_by(AgentWorkflowStep.position.asc()).first()
@@ -168,7 +190,10 @@ def review_agent_workflow_step(workflow_id: int, step_id: int, body: dict, proje
             nxt.detail = {**(nxt.detail or {}), "handoff": handoff}
             job = enqueue_ai_job(db, project=project, module_type=nxt.step_name, request_payload={**base, "workflow_step_id": nxt.id})
             nxt.ai_job_id, nxt.status = job.id, "running"
-            step.workflow.status, step.workflow.current_step = "running", nxt.position
+            run.status, run.current_step = "running", nxt.position
+            log_action(db, module="ai", action="workflow.step.approved",
+                       message=f"workflow #{workflow_id} step #{step_id} approved",
+                       detail={"workflow_id": workflow_id, "step_id": step_id, "note": body.note or ""}, project_id=project.id)
     db.commit(); db.refresh(step)
     return _workflow_payload(step.workflow)
 

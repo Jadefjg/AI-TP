@@ -17,6 +17,8 @@ def progress_after_step(db: Session, *, project: Project, step_id: int, result: 
         return run
     step.status = "completed"
     step.detail = {**(step.detail or {}), "result": result}
+    if step.agent_key in {"requirement", "perf", "security"} and step.review_status == "not_required":
+        step.review_status = "pending_review"
     if step.review_status in {"pending_review", "rejected"}:
         run.status = "pending_review"
         return run
