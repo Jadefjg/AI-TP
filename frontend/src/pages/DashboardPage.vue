@@ -117,7 +117,7 @@ onMounted(() => {
 
     <a-card class="ai-panel ai-launch-panel" title="智能流水入口" style="margin-bottom: 16px">
       <a-typography-text type="secondary">
-        建议按顺序推进：需求 Agent → UI Agent → 接口 Agent → 性能 Agent → 安全 Agent。顶栏可切换当前项目，上下文会带到各阶段。
+        建议按顺序推进：需求 Agent → Case Agent → UI Agent → 接口 Agent → 性能 Agent → 安全 Agent。顶栏可切换当前项目，上下文会带到各阶段。
       </a-typography-text>
       <div class="ai-launch" style="margin-top: 14px">
         <button

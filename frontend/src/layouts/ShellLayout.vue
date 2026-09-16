@@ -42,10 +42,11 @@ const navEntries: Array<NavLeaf | NavGroup> = [
     label: "智能流水",
     children: [
       { to: "/requirements", label: "01 需求 Agent", permission: "ai.read" },
-      { to: "/ui-management", label: "02 UI Agent", permission: "ai.read" },
-      { to: "/interface-management", label: "03 接口 Agent", permission: "ai.read" },
-      { to: "/perf-management", label: "04 性能 Agent", permission: "ai.read" },
-      { to: "/security-management", label: "05 安全 Agent", permission: "ai.read" },
+      { to: "/cases", label: "02 Case Agent", permission: "case.read" },
+      { to: "/ui-management", label: "03 UI Agent", permission: "ai.read" },
+      { to: "/interface-management", label: "04 接口 Agent", permission: "ai.read" },
+      { to: "/perf-management", label: "05 性能 Agent", permission: "ai.read" },
+      { to: "/security-management", label: "06 安全 Agent", permission: "ai.read" },
     ],
   },
   {

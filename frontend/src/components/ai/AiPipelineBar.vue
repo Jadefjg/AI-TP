@@ -90,7 +90,7 @@ const go = (step: AiPipelineStep) => {
 
 .ai-pipeline__row {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 8px;
   align-items: stretch;
 }

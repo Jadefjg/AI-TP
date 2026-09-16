@@ -1,6 +1,6 @@
 export const PIPELINE_SUITE_NAME = "智能流水 · 自动套件";
 
-export type AiPipelineStepKey = "requirements" | "ui" | "interface" | "perf" | "security";
+export type AiPipelineStepKey = "requirements" | "cases" | "ui" | "interface" | "perf" | "security";
 
 export type AiPipelineStep = {
   key: AiPipelineStepKey;
@@ -28,9 +28,17 @@ export const AI_PIPELINE_STEPS: AiPipelineStep[] = [
     path: "/requirements",
   },
   {
+    key: "cases",
+    label: "Case Agent",
+    short: "02",
+    hint: "用例生成 · 管理 · 编排",
+    routeName: "cases",
+    path: "/cases",
+  },
+  {
     key: "ui",
     label: "UI Agent",
-    short: "02",
+    short: "03",
     hint: "Playwright GUI Agent",
     routeName: "ui-management",
     path: "/ui-management",
@@ -38,7 +46,7 @@ export const AI_PIPELINE_STEPS: AiPipelineStep[] = [
   {
     key: "interface",
     label: "接口 Agent",
-    short: "03",
+    short: "04",
     hint: "DSL 生成与调试执行",
     routeName: "interface-management",
     path: "/interface-management",
@@ -46,7 +54,7 @@ export const AI_PIPELINE_STEPS: AiPipelineStep[] = [
   {
     key: "perf",
     label: "性能 Agent",
-    short: "04",
+    short: "05",
     hint: "压测方案 · k6 下发",
     routeName: "perf-management",
     path: "/perf-management",
@@ -54,7 +62,7 @@ export const AI_PIPELINE_STEPS: AiPipelineStep[] = [
   {
     key: "security",
     label: "安全 Agent",
-    short: "05",
+    short: "06",
     hint: "Payload · 扫描 · 报告",
     routeName: "security-management",
     path: "/security-management",
@@ -71,9 +79,6 @@ export const pipelineStepFromRoute = (route: {
   if (byName) return byName;
   const path = route.path || "";
   if (!path) return null;
-  if (path === "/cases" || path.startsWith("/cases/")) {
-    return AI_PIPELINE_STEPS.find((step) => step.key === "requirements") || null;
-  }
   const matches = AI_PIPELINE_STEPS.filter(
     (step) => path === step.path || path.startsWith(`${step.path}/`),
   );

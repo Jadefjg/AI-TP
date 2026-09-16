@@ -43,7 +43,18 @@ const openUiAgent = () => {
             <AiFunctionalCasesTab />
           </div>
         </a-collapse-item>
-        <a-collapse-item header="02 · UI Agent（Playwright）" key="2">
+        <a-collapse-item header="02 · Case Agent（功能用例）" key="2">
+          <a-alert
+            type="info"
+            show-icon
+            title="Case Agent 负责将需求场景沉淀为可执行、可维护的功能测试用例。"
+            style="margin-bottom: 12px"
+          />
+          <a-button type="primary" @click="() => router.push({ path: '/cases', query: { projectId: String(projectId) } })">
+            打开 Case Agent
+          </a-button>
+        </a-collapse-item>
+        <a-collapse-item header="03 · UI Agent（Playwright）" key="3">
           <a-alert
             type="info"
             show-icon
@@ -52,16 +63,16 @@ const openUiAgent = () => {
           />
           <a-button type="primary" @click="openUiAgent">打开项目 UI Agent</a-button>
           <a-button style="margin-left: 8px" @click="() => router.push({ path: '/ui-management', query: { projectId: String(projectId) } })">
-            打开全局 02 UI Agent
+            打开全局 03 UI Agent
           </a-button>
         </a-collapse-item>
-        <a-collapse-item header="03 · 接口 Agent" key="3">
+        <a-collapse-item header="04 · 接口 Agent" key="4">
           <AiApiDslTab />
         </a-collapse-item>
-        <a-collapse-item header="04 · 性能 Agent" key="4">
+        <a-collapse-item header="05 · 性能 Agent" key="5">
           <AiPerfTab />
         </a-collapse-item>
-        <a-collapse-item header="05 · 安全 Agent" key="5">
+        <a-collapse-item header="06 · 安全 Agent" key="6">
           <AiSecurityTab />
         </a-collapse-item>
       </a-collapse>
