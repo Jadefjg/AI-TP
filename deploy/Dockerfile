@@ -37,6 +37,7 @@ COPY pyproject.toml README.md ./
 COPY backend ./backend
 COPY alembic.ini ./
 COPY alembic ./alembic
+COPY scripts/migrate.sh ./scripts/migrate.sh
 
 # Optional: PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/ (Aliyun ECS)
 ARG PIP_INDEX_URL=
@@ -51,7 +52,7 @@ RUN mkdir -p /app/data /app/data/mail_outbox
 COPY deploy/scripts/entrypoint-api.sh /entrypoint-api.sh
 COPY deploy/scripts/entrypoint-worker.sh /entrypoint-worker.sh
 COPY deploy/scripts/resolve-database-url.sh /resolve-database-url.sh
-RUN chmod +x /entrypoint-api.sh /entrypoint-worker.sh /resolve-database-url.sh
+RUN chmod +x /entrypoint-api.sh /entrypoint-worker.sh /resolve-database-url.sh /app/scripts/migrate.sh
 
 EXPOSE 8002
 

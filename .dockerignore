@@ -36,7 +36,7 @@ data/**
 
 # Docs / tests not needed in runtime image (keep tests out of prod image)
 # (source still copied selectively in Dockerfile)
+# Keep top-level scripts/ (migrate.sh is required by entrypoint-api.sh).
 docs
-scripts
 *.md
 !README.md

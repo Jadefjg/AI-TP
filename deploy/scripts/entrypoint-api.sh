@@ -38,7 +38,7 @@ PY
 
 if [ "${RUN_MIGRATIONS:-true}" = "true" ]; then
   echo "[api] ensuring schema (base bootstrap + alembic)"
-  bash scripts/migrate.sh
+  bash /app/scripts/migrate.sh
 fi
 
 echo "[api] starting uvicorn on 0.0.0.0:8002"
