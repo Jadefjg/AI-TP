@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Message } from "@arco-design/web-vue";
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { RouterView } from "vue-router";
 import { projectsApi } from "../api/projects";
@@ -18,6 +18,17 @@ const store = usePlatformStore();
 const route = useRoute();
 const router = useRouter();
 const collapsed = ref(false);
+const SIDER_MIN = 180;
+const SIDER_MAX = 420;
+const SIDER_DEFAULT = 248;
+const SIDER_STORAGE_KEY = "ai-tp-sider-width";
+const siderWidth = ref(SIDER_DEFAULT);
+const siderResizing = ref(false);
+let resizeStartX = 0;
+let resizeStartWidth = SIDER_DEFAULT;
+
+const clampSiderWidth = (value: number) =>
+  Math.min(SIDER_MAX, Math.max(SIDER_MIN, Math.round(value)));
 const showDebug = ref(false);
 const settingsVisible = ref(false);
 const settingsTab = ref<"profile" | "password" | "api">("profile");
@@ -373,18 +384,82 @@ const onDropdownSelect = (value: string | number | Record<string, unknown> | und
   }
 };
 
+const siderStyle = computed(() => ({
+  "--shell-sider-width": `${collapsed.value ? 48 : siderWidth.value}px`,
+}));
+
+const persistSiderWidth = () => {
+  try {
+    localStorage.setItem(SIDER_STORAGE_KEY, String(siderWidth.value));
+  } catch {
+    /* ignore quota / private mode */
+  }
+};
+
+const onSiderResizeMove = (event: PointerEvent) => {
+  if (!siderResizing.value) return;
+  event.preventDefault();
+  if (collapsed.value) collapsed.value = false;
+  siderWidth.value = clampSiderWidth(resizeStartWidth + (event.clientX - resizeStartX));
+};
+
+const onSiderResizeEnd = (event?: PointerEvent) => {
+  if (!siderResizing.value) return;
+  siderResizing.value = false;
+  document.body.classList.remove("shell-sider-resizing");
+  document.body.style.removeProperty("cursor");
+  document.body.style.removeProperty("user-select");
+  window.removeEventListener("pointermove", onSiderResizeMove);
+  window.removeEventListener("pointerup", onSiderResizeEnd);
+  window.removeEventListener("pointercancel", onSiderResizeEnd);
+  persistSiderWidth();
+};
+
+const onSiderResizeStart = (event: PointerEvent) => {
+  if (event.pointerType === "mouse" && event.button !== 0) return;
+  event.preventDefault();
+  event.stopPropagation();
+  siderResizing.value = true;
+  resizeStartX = event.clientX;
+  resizeStartWidth = collapsed.value ? 48 : siderWidth.value;
+  document.body.classList.add("shell-sider-resizing");
+  document.body.style.cursor = "col-resize";
+  document.body.style.userSelect = "none";
+  window.addEventListener("pointermove", onSiderResizeMove);
+  window.addEventListener("pointerup", onSiderResizeEnd);
+  window.addEventListener("pointercancel", onSiderResizeEnd);
+};
+
+const onSiderResizeReset = () => {
+  collapsed.value = false;
+  siderWidth.value = SIDER_DEFAULT;
+  persistSiderWidth();
+};
+
 onMounted(() => {
+  try {
+    const saved = Number(localStorage.getItem(SIDER_STORAGE_KEY));
+    if (Number.isFinite(saved)) siderWidth.value = clampSiderWidth(saved);
+  } catch {
+    /* ignore */
+  }
   void loadProjects();
+});
+
+onUnmounted(() => {
+  onSiderResizeEnd();
 });
 </script>
 
 <template>
-  <a-layout class="arco-shell">
+  <div class="arco-shell" :class="{ 'arco-shell--resizing': siderResizing }">
     <a-layout-sider
       class="shell-sider"
       :collapsed="collapsed"
       collapsible
-      :width="248"
+      :collapsed-width="48"
+      :width="siderWidth"
+      :style="siderStyle"
       @collapse="(v: boolean) => (collapsed = v)"
     >
       <div class="brand">
@@ -420,7 +495,15 @@ onMounted(() => {
         </a-menu>
       </div>
     </a-layout-sider>
-
+    <div
+      class="shell-resize"
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="拖动调整侧栏宽度"
+      title="左右拖动调整宽度，双击恢复默认"
+      @pointerdown="onSiderResizeStart"
+      @dblclick="onSiderResizeReset"
+    />
     <a-layout class="shell-main">
       <a-layout-header class="top-header">
         <div class="top-header__left">
@@ -496,28 +579,86 @@ onMounted(() => {
         </div>
       </a-layout-content>
     </a-layout>
-
     <UserSettingsModal v-model:visible="settingsVisible" :initial-tab="settingsTab" />
-  </a-layout>
+  </div>
 </template>
 
 <style scoped>
 .arco-shell {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
   height: 100vh;
   max-height: 100vh;
   overflow: hidden;
   background: transparent;
 }
 
+.arco-shell--resizing,
+.arco-shell--resizing * {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+
 .shell-sider {
+  position: relative;
   height: 100vh !important;
   max-height: 100vh;
   overflow: hidden !important;
   background:
     radial-gradient(ellipse 80% 40% at 20% 0%, rgba(14, 165, 233, 0.22), transparent 55%),
     linear-gradient(180deg, #07111f 0%, #0b1220 55%, #0a1628 100%) !important;
-  border-right: 1px solid rgba(56, 189, 248, 0.12);
+  border-right: none;
   box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.03);
+}
+
+.shell-sider:not(.arco-layout-sider-collapsed) {
+  width: var(--shell-sider-width, 248px) !important;
+  min-width: var(--shell-sider-width, 248px) !important;
+  max-width: var(--shell-sider-width, 248px) !important;
+  flex: 0 0 var(--shell-sider-width, 248px) !important;
+}
+
+.shell-sider.arco-layout-sider-collapsed {
+  width: 48px !important;
+  min-width: 48px !important;
+  max-width: 48px !important;
+  flex: 0 0 48px !important;
+}
+
+.arco-shell--resizing .shell-main {
+  pointer-events: none;
+}
+
+.shell-resize {
+  position: relative;
+  z-index: 8;
+  flex: 0 0 10px;
+  width: 10px;
+  margin: 0 -5px;
+  cursor: col-resize;
+  touch-action: none;
+  background: transparent;
+}
+
+.shell-resize::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 4px;
+  width: 2px;
+  border-radius: 2px;
+  background: rgba(56, 189, 248, 0.35);
+  transition: background 0.15s ease, box-shadow 0.15s ease, width 0.15s ease, left 0.15s ease;
+}
+
+.shell-resize:hover::after,
+.arco-shell--resizing .shell-resize::after {
+  left: 3px;
+  width: 4px;
+  background: #22d3ee;
+  box-shadow: 0 0 12px rgba(34, 211, 238, 0.65);
 }
 
 .shell-sider :deep(.arco-layout-sider-children) {
@@ -579,6 +720,9 @@ onMounted(() => {
   border-radius: 10px;
   margin: 2px 8px;
   font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .shell-sider :deep(.arco-menu-item .arco-icon),
@@ -661,8 +805,10 @@ onMounted(() => {
 }
 
 .shell-main {
+  position: relative;
   display: flex;
   flex-direction: column;
+  flex: 1 1 auto;
   height: 100vh;
   max-height: 100vh;
   overflow: hidden;
@@ -928,5 +1074,13 @@ onMounted(() => {
   background: transparent;
   white-space: pre-wrap;
   word-break: break-word;
+}
+</style>
+
+<style>
+body.shell-sider-resizing,
+body.shell-sider-resizing * {
+  cursor: col-resize !important;
+  user-select: none !important;
 }
 </style>

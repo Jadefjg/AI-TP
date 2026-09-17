@@ -55,7 +55,7 @@ export const authApi = {
       },
       authOpts,
     );
-    authStore.setToken(session.access_token);
+    authStore.setSession(session.access_token, session.user);
     return session;
   },
 };

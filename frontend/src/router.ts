@@ -348,48 +348,37 @@ const router = createRouter({
 
 router.beforeEach(async (to) => {
   const store = usePlatformStore();
-  const token = authStore.getToken();
+  if (!store.authReady.value) {
+    await store.bootstrapSession();
+  }
+
   const requiresAuth = to.matched.some((record) => record.meta.requiresAuth);
 
   if (to.name === "login" || to.name === "register") {
-    if (!token) {
-      return true;
-    }
-    if (!store.authReady.value) {
-      await store.bootstrapSession();
-    }
-    if (store.isAuthenticated.value) {
+    if (authStore.getToken()) {
       const redirect = typeof to.query.redirect === "string" ? to.query.redirect : "/dashboard";
       return redirect;
     }
     return true;
   }
 
-  if (requiresAuth && to.name !== "forbidden") {
-    if (!token) {
+  if (requiresAuth) {
+    if (!authStore.getToken()) {
       return { name: "login", query: { redirect: to.fullPath } };
     }
-    if (!store.authReady.value) {
-      await store.bootstrapSession();
-    }
-    if (!store.isAuthenticated.value || !authStore.getToken()) {
-      return { name: "login", query: { redirect: to.fullPath } };
-    }
-    const denied = getRoutePermissionDenied(to);
-    if (denied) {
-      return {
-        name: "forbidden",
-        query: {
-          from: to.fullPath,
-          permission: formatRequiredPermissions(denied.required),
-        },
-      };
+    if (store.currentUser.value && to.name !== "forbidden") {
+      const denied = getRoutePermissionDenied(to);
+      if (denied) {
+        return {
+          name: "forbidden",
+          query: {
+            from: to.fullPath,
+            permission: formatRequiredPermissions(denied.required),
+          },
+        };
+      }
     }
     return true;
-  }
-
-  if (requiresAuth && !token) {
-    return { name: "login", query: { redirect: to.fullPath } };
   }
 
   return true;

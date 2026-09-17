@@ -182,7 +182,9 @@ def review_agent_workflow_step(workflow_id: int, step_id: int, body: AgentWorkfl
     if status == "approved":
         from backend.services.ai_job_queue import enqueue_ai_job
         nxt = db.query(AgentWorkflowStep).filter(AgentWorkflowStep.workflow_id == workflow_id, AgentWorkflowStep.position > step.position).order_by(AgentWorkflowStep.position.asc()).first()
-        if nxt and not nxt.ai_job_id:
+        existing = db.query(AiAsyncJob).filter_by(id=nxt.ai_job_id).one_or_none() if nxt and nxt.ai_job_id else None
+        if nxt and (not existing or existing.status in {"failed", "cancelled"}):
+            nxt.ai_job_id = None
             from backend.services.agents.artifact_adapters import build_validated_handoff
             prior = step.detail.get("result") if isinstance(step.detail, dict) else {}
             handoff = build_validated_handoff(nxt.step_name, run_input=dict(step.workflow.input_payload or {}), result=prior if isinstance(prior, dict) else {})

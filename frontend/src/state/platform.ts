@@ -7,7 +7,7 @@ import type { User, AuthSession } from "../types";
 const authReady = ref(false);
 const loading = ref(false);
 const output = ref("");
-const currentUser = ref<User | null>(null);
+const currentUser = ref<User | null>(authStore.getUser());
 
 const isAuthenticated = computed(() => Boolean(currentUser.value));
 const permissionCodes = computed(() => {
@@ -20,6 +20,8 @@ const permissionCodes = computed(() => {
   return codes;
 });
 
+let bootstrapPromise: Promise<void> | null = null;
+
 const setOut = (value: unknown) => {
   output.value = JSON.stringify(value, null, 2);
 };
@@ -27,6 +29,27 @@ const setOut = (value: unknown) => {
 const clearSessionState = () => {
   authStore.clear();
   currentUser.value = null;
+};
+
+const restorePersistedUser = () => {
+  if (currentUser.value) return;
+  const persisted = authStore.getUser();
+  if (persisted) {
+    currentUser.value = persisted;
+  }
+};
+
+const isTransientSessionError = (error: unknown) => {
+  const raw = error instanceof Error ? error.message : String(error);
+  return (
+    raw === "请求已取消" ||
+    /请求超时|无法连接后端 API|Failed to fetch|NetworkError|Load failed/i.test(raw)
+  );
+};
+
+const isUnauthorizedError = (error: unknown) => {
+  const raw = error instanceof Error ? error.message : String(error);
+  return /登录已失效|invalid or expired token|authentication required|Unauthorized/i.test(raw);
 };
 
 const wrap = async (fn: () => Promise<void>, options?: { background?: boolean }) => {
@@ -42,13 +65,9 @@ const wrap = async (fn: () => Promise<void>, options?: { background?: boolean })
     if (message === "请求已取消") {
       return;
     }
-    const isAuthError =
-      message.includes("authentication required") ||
-      message.includes("invalid or expired token") ||
-      message.includes("登录已失效") ||
-      message.includes("认证");
-    if (!background && isAuthError && authStore.getToken()) {
-      clearSessionState();
+    if (!authStore.getToken() && currentUser.value) {
+      currentUser.value = null;
+      authStore.clear();
     }
     if (!background) {
       setOut({ error: message });
@@ -83,26 +102,51 @@ const friendlyErrorMessage = (error: unknown): string => {
 
 const runBackground = (fn: () => Promise<void>) => wrap(fn, { background: true });
 
-const bootstrapSession = async () => {
-  const token = authStore.getToken();
-  if (!token) {
-    currentUser.value = null;
-    authReady.value = true;
-    return;
-  }
+const fetchCurrentUser = async () => {
   try {
-    currentUser.value = await authApi.me();
+    return await authApi.me();
   } catch (error) {
-    clearSessionState();
-  } finally {
-    authReady.value = true;
+    if (!isTransientSessionError(error) || !authStore.getToken()) {
+      throw error;
+    }
+    return await authApi.me();
   }
+};
+
+const bootstrapSession = () => {
+  if (bootstrapPromise) {
+    return bootstrapPromise;
+  }
+  bootstrapPromise = (async () => {
+    const token = authStore.getToken();
+    if (!token) {
+      currentUser.value = null;
+      authReady.value = true;
+      return;
+    }
+    restorePersistedUser();
+    try {
+      const user = await fetchCurrentUser();
+      currentUser.value = user;
+      authStore.setUser(user);
+    } catch (error) {
+      if (!authStore.getToken() || isUnauthorizedError(error)) {
+        clearSessionState();
+        return;
+      }
+      restorePersistedUser();
+    } finally {
+      authReady.value = true;
+    }
+  })().finally(() => {
+    bootstrapPromise = null;
+  });
+  return bootstrapPromise;
 };
 
 const login = async (body: { username: string; password: string }) => {
   const session = await authApi.login(body);
-  authStore.setToken(session.access_token);
-  currentUser.value = session.user;
+  applySession(session);
   output.value = "";
 };
 
@@ -113,8 +157,7 @@ const register = async (body: {
   email?: string | null;
 }) => {
   const session = await authApi.register(body);
-  authStore.setToken(session.access_token);
-  currentUser.value = session.user;
+  applySession(session);
   output.value = "";
 };
 
@@ -129,11 +172,13 @@ const logout = async () => {
 };
 
 const refreshCurrentUser = async () => {
-  currentUser.value = await authApi.me();
+  const user = await authApi.me();
+  currentUser.value = user;
+  authStore.setUser(user);
 };
 
 const applySession = (session: AuthSession) => {
-  authStore.setToken(session.access_token);
+  authStore.setSession(session.access_token, session.user);
   currentUser.value = session.user;
 };
 

@@ -87,7 +87,11 @@ export async function req<T>(
   }
   const timeoutMs = options?.timeoutMs ?? 30_000;
   const controller = new AbortController();
-  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+  let timedOut = false;
+  const timer = window.setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, timeoutMs);
   // Preserve caller AbortSignal (e.g. route leave) while still enforcing timeout.
   const callerSignal = init?.signal;
   if (callerSignal) {
@@ -115,7 +119,7 @@ export async function req<T>(
     return data as T;
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
-      if (callerSignal?.aborted) {
+      if (callerSignal?.aborted || !timedOut) {
         throw new Error("请求已取消");
       }
       throw new Error(
@@ -165,7 +169,11 @@ export async function reqFormData<T>(
   const token = authStore.getToken();
   const timeoutMs = options?.timeoutMs ?? 120_000;
   const controller = new AbortController();
-  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+  let timedOut = false;
+  const timer = window.setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, timeoutMs);
   const callerSignal = init?.signal;
   if (callerSignal) {
     if (callerSignal.aborted) {
@@ -193,7 +201,7 @@ export async function reqFormData<T>(
     return data as T;
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
-      if (callerSignal?.aborted) {
+      if (callerSignal?.aborted || !timedOut) {
         throw new Error("请求已取消");
       }
       throw new Error("请求超时，AI 分析耗时较长，请稍后重试");

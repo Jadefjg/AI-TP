@@ -1,24 +1,24 @@
 <script setup lang="ts">
-import { onMounted, watch } from "vue";
+import { watch } from "vue";
 import { RouterView, useRoute, useRouter } from "vue-router";
+import { authStore } from "./api/auth-store";
 import { usePlatformStore } from "./state/platform";
 
 const route = useRoute();
 const router = useRouter();
 const store = usePlatformStore();
 
-onMounted(() => {
-  void store.bootstrapSession();
-});
-
 watch(
-  [() => store.authReady.value, () => store.isAuthenticated.value, () => route.name],
-  ([ready, authenticated, routeName]) => {
-    if (!ready || routeName === "login") {
+  [() => store.authReady.value, () => store.currentUser.value, () => route.name],
+  ([ready]) => {
+    if (!ready) {
+      return;
+    }
+    if (route.name === "login" || route.name === "register") {
       return;
     }
     const requiresAuth = route.matched.some((record) => Boolean(record.meta.requiresAuth));
-    if (requiresAuth && !authenticated) {
+    if (requiresAuth && !authStore.getToken()) {
       void router.replace({ name: "login", query: { redirect: route.fullPath } });
     }
   },

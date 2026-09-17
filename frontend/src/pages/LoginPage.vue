@@ -30,9 +30,15 @@ onMounted(() => {
 
 const submit = async () => {
   loginError.value = "";
+  const username = loginForm.username.trim();
+  const password = loginForm.password;
+  if (!username || !password) {
+    loginError.value = "请输入用户名和密码";
+    return;
+  }
   store.loading.value = true;
   try {
-    await store.login(loginForm);
+    await store.login({ username, password });
     const redirect = typeof route.query.redirect === "string" ? route.query.redirect : "/dashboard";
     await router.replace(redirect);
   } catch (error) {

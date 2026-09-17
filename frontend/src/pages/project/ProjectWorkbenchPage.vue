@@ -149,7 +149,7 @@ onMounted(() => {
         </a-space>
         <a-steps v-if="workflow" :current="workflow.current_step" style="margin-top: 16px">
           <a-step v-for="step in workflow.steps" :key="step.id" :title="step.agent_key" :description="`${step.status} · ${step.review_status}`">
-            <template #description><span>{{ step.status }} · {{ step.review_status }}</span><a-button size="mini" @click="previewStep(step)">预览交接</a-button><a-button v-if="step.review_status === 'pending_review'" size="mini" type="primary" @click="reviewStep(step, 'approved')">通过</a-button><a-button v-if="step.review_status === 'pending_review'" size="mini" status="danger" @click="reviewStep(step, 'rejected')">驳回</a-button><a-button v-if="step.status === 'failed' || step.status === 'pending'" size="mini" status="warning" @click="retryStep(step)">重试</a-button><pre v-if="step.handoffPreview" style="max-width: 280px; white-space: pre-wrap">{{ JSON.stringify(step.handoffPreview, null, 2) }}</pre></template>
+            <template #description><span>{{ step.status }} · {{ step.review_status }}</span><a-button size="mini" @click="previewStep(step)">预览交接</a-button><a-button v-if="step.review_status === 'pending_review'" size="mini" type="primary" @click="reviewStep(step, 'approved')">通过</a-button><a-button v-if="step.review_status === 'pending_review'" size="mini" status="danger" @click="reviewStep(step, 'rejected')">驳回</a-button><a-button v-if="step.status === 'failed' || step.status === 'skipped'" size="mini" status="warning" @click="retryStep(step)">重试</a-button><pre v-if="step.handoffPreview" style="max-width: 280px; white-space: pre-wrap">{{ JSON.stringify(step.handoffPreview, null, 2) }}</pre></template>
           </a-step>
         </a-steps>
       </a-card>
