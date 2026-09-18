@@ -19,3 +19,9 @@ def test_normalize_legacy_outputs():
     result = normalize_result("interface", {"status": "passed", "job_id": 9, "findings": []})
     assert isinstance(result, AgentResult)
     assert result.agent_key == "interface" and result.artifact_id == 9
+
+
+def test_failed_agent_result_contract_is_explicit():
+    result = normalize_result("interface", {"status": "failed", "error": "timeout"})
+    assert result.status == "failed"
+    assert result.error == "timeout"

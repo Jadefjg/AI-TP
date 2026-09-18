@@ -18,6 +18,12 @@ def progress_after_step(db: Session, *, project: Project, step_id: int, result: 
     # A late/duplicate worker callback must not reopen a terminal workflow.
     if run.status in {"completed", "rejected", "cancelled"} and step.status == "completed":
         return run
+    if str(result.get("status", "completed")) in {"failed", "error"}:
+        step.status = "failed"
+        step.detail = {**(step.detail or {}), "result": result, "error": result.get("error")}
+        run.status = "failed"
+        run.current_step = step.position
+        return run
     step.status = "completed"
     step.detail = {**(step.detail or {}), "result": result}
     if step.agent_key in {"requirement", "perf", "security"} and step.review_status == "not_required":

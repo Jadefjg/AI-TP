@@ -23,9 +23,11 @@ def normalize_result(agent_key: str, value: Any, *, trace=None, attempt: int = 1
     if isinstance(value, dict):
         status = str(value.get("status") or "completed")
         artifact_id = value.get("artifact_id") or value.get("job_id")
+        error = value.get("error")
     else:
         status, artifact_id = "completed", (ids[0] if ids else None)
+        error = None
     status = {"passed": "completed", "success": "completed"}.get(status, status)
     return AgentResult(agent_key=agent_key, status=status, payload=payload,
                        artifact_id=artifact_id, attempt=attempt,
-                       review_status=review_status, trace=trace or [])
+                       review_status=review_status, trace=trace or [], error=error)

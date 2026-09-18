@@ -332,6 +332,10 @@ def process_ai_job(db: Session, job_id: int, *, auto_claim: bool = True) -> None
             workflow_step_id = (job.request_payload or {}).get("workflow_step_id") if isinstance(job.request_payload, dict) else None
             if workflow_step_id:
                 from backend.services.agent_workflow_progression import progress_after_step
+                from backend.models.entities import AgentWorkflowStep
+                linked_step = db.query(AgentWorkflowStep).filter_by(id=workflow_step_id).one_or_none()
+                if linked_step:
+                    linked_step.attempt_count = max(linked_step.attempt_count, job.attempt_count)
                 progress_after_step(db, project=project, step_id=workflow_step_id, result=result_payload)
                 db.commit()
                 job.completed_at = _now()
@@ -346,6 +350,7 @@ def process_ai_job(db: Session, job_id: int, *, auto_claim: bool = True) -> None
             from backend.models.entities import AgentWorkflowStep, AgentWorkflowRun
             step = db.query(AgentWorkflowStep).filter_by(id=workflow_step_id).one_or_none()
             if step:
+                step.attempt_count = max(step.attempt_count, job.attempt_count)
                 step.status = "failed" if job.attempt_count >= job.max_attempts else "pending"
                 step.detail = {**(step.detail or {}), "error": str(exc)}
                 run = db.query(AgentWorkflowRun).filter_by(id=step.workflow_id).one_or_none()
