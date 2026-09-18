@@ -178,6 +178,13 @@ async def _execute_ai_module(db: Session, job: AiAsyncJob, project: Project) -> 
 
     req = job.request_payload if isinstance(job.request_payload, dict) else {}
     module = job.module_type
+    # LangGraph adapter is the canonical execution path for the six workflow
+    # agents; requirement review keeps its persistence-specific wrapper below.
+    if module in {MODULE_API_AUTOMATION, MODULE_PERF_PLAN, MODULE_SECURITY_SCAN}:
+        from backend.services.agents.langgraph_workflow import invoke_agent_graph
+        key = {MODULE_API_AUTOMATION: "interface", MODULE_PERF_PLAN: "perf", MODULE_SECURITY_SCAN: "security"}[module]
+        graph_state = await invoke_agent_graph(agent_key=key, payload=req, db=db, project=project)
+        return graph_state["result"]
 
     if module == MODULE_REQUIREMENT_REVIEW:
         text = (req.get("requirement_text") or "").strip()
@@ -209,13 +216,11 @@ async def _execute_ai_module(db: Session, job: AiAsyncJob, project: Project) -> 
         return _task_result_to_dict(workflow_result.task, contexts=workflow_result.contexts)
 
     if module == MODULE_FUNCTIONAL_CASES:
-        result = await requirement_agent.generate_case_artifact(
-            db,
-            project,
-            requirement_text=req.get("requirement_text") or "",
-            openapi_content=req.get("openapi_content"),
-        )
-        return _task_result_to_dict(result)
+        from backend.services.agents.langgraph_workflow import invoke_agent_graph
+        graph_state = await invoke_agent_graph(agent_key="functional_case", payload=req, db=db, project=project)
+        result = graph_state["result"]
+        result.setdefault("module_type", MODULE_FUNCTIONAL_CASES)
+        return result
 
     if module == MODULE_API_AUTOMATION:
         project_ctx = _project_api_context(project)
@@ -344,7 +349,9 @@ def process_ai_job(db: Session, job_id: int, *, auto_claim: bool = True) -> None
                 step.status = "failed" if job.attempt_count >= job.max_attempts else "pending"
                 step.detail = {**(step.detail or {}), "error": str(exc)}
                 run = db.query(AgentWorkflowRun).filter_by(id=step.workflow_id).one_or_none()
-                if run and step.status == "failed": run.status = "failed"
+                if run:
+                    run.status = "failed" if step.status == "failed" else "running"
+                    run.detail = {**(run.detail or {}), "last_error": {"step_id": step.id, "message": str(exc), "attempt": job.attempt_count}}
         job.last_error = str(exc)
         if job.attempt_count < job.max_attempts and not job.cancel_requested:
             job.status = JobStatus.pending.value

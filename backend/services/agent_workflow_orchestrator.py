@@ -7,6 +7,7 @@ from backend.schemas.agent import AgentTrace, AgentWorkflowPlan, WorkflowStep
 DEFAULT_PIPELINE = [("requirement", "requirement_review"), ("ui", "ui_automation"),
                     ("interface", "api_automation"), ("perf", "perf_plan"),
                     ("security", "security_scan")]
+SIX_AGENT_PIPELINE = [("requirement", "requirement_review"), ("functional_case", "functional_cases"), *DEFAULT_PIPELINE[1:]]
 
 
 def build_pipeline_plan(project_id: int, *, enabled: set[str] | None = None) -> AgentWorkflowPlan:

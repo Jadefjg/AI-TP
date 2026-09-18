@@ -15,6 +15,9 @@ def progress_after_step(db: Session, *, project: Project, step_id: int, result: 
     run = db.query(AgentWorkflowRun).filter_by(id=step.workflow_id, project_id=project.id).with_for_update().one()
     if step.status == "completed" and step.detail and step.detail.get("result") == result:
         return run
+    # A late/duplicate worker callback must not reopen a terminal workflow.
+    if run.status in {"completed", "rejected", "cancelled"} and step.status == "completed":
+        return run
     step.status = "completed"
     step.detail = {**(step.detail or {}), "result": result}
     if step.agent_key in {"requirement", "perf", "security"} and step.review_status == "not_required":

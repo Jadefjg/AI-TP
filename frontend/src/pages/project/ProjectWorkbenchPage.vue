@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { onMounted, onUnmounted, ref } from "vue";
 import { workbenchApi, agentWorkflowApi } from "../../api/ai";
 import { useProjectScope } from "../../composables/useProjectScope";
 import { usePlatformStore } from "../../state/platform";
@@ -27,6 +27,7 @@ const workflow = ref<any>(null);
 const requirementText = ref("");
 const reviewNote = ref("");
 const workflows = ref<any[]>([]);
+let workflowPoller: ReturnType<typeof setInterval> | undefined;
 const startWorkflow = () => store.wrap(async () => {
   if (!requirementText.value.trim()) return;
   workflow.value = await agentWorkflowApi.create(projectId.value, { requirement_text: requirementText.value.trim() });
@@ -92,7 +93,11 @@ const applySession = () =>
 onMounted(() => {
   void loadSessions();
   void loadWorkflows();
+  workflowPoller = setInterval(() => {
+    if (workflow.value?.id) void agentWorkflowApi.get(projectId.value, workflow.value.id).then((value) => { workflow.value = value; });
+  }, 5000);
 });
+onUnmounted(() => { if (workflowPoller) clearInterval(workflowPoller); });
 </script>
 
 <template>

@@ -21,9 +21,12 @@ dependencies = [
   "pypdf>=5.1.0",
   "cryptography>=43.0.0",
   "playwright>=1.49.0",
+  "langgraph>=0.2.0",
 ]
 
 [project.optional-dependencies]
+langgraph-redis = ["langgraph-checkpoint-redis>=0.5.0", "redis>=5.2.0"]
+langgraph-postgres = ["langgraph-checkpoint-postgres>=3.0.0", "psycopg[binary]>=3.2.0"]
 dev = ["pytest>=8.3.0", "ruff>=0.8.0", "prometheus-client>=0.21.0"]
 mysql = ["pymysql>=1.1.0", "cryptography>=43.0.0"]
 redis = ["redis>=5.2.0"]

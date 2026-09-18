@@ -421,6 +421,8 @@ export const agentWorkflowApi = {
     req<Record<string, unknown>>(`/projects/${projectId}/agent-workflows/${workflowId}/steps/${stepId}/retry`, { method: "POST" }),
   preview: (projectId: number, workflowId: number, stepId: number) =>
     req<Record<string, any>>(`/projects/${projectId}/agent-workflows/${workflowId}/steps/${stepId}/preview-handoff`, { method: "POST" }),
+  reviews: (projectId: number, workflowId: number, stepId: number) => req<any[]>(`/projects/${projectId}/agent-workflows/${workflowId}/steps/${stepId}/reviews`),
+  resubmit: (projectId: number, workflowId: number, stepId: number, note = "") => req<Record<string, unknown>>(`/projects/${projectId}/agent-workflows/${workflowId}/steps/${stepId}/resubmit`, { method: "POST", body: JSON.stringify({ status: "resubmitted", note }) }),
 };
 
 export const integrationsApi = {

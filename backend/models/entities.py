@@ -297,6 +297,8 @@ class AgentWorkflowRun(Base):
     current_step: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     detail: Mapped[dict | None] = mapped_column(JSON, default=None)
     input_payload: Mapped[dict | None] = mapped_column(JSON, default=None)
+    # Stable LangGraph checkpoint namespace; unique to prevent cross-run replay.
+    thread_id: Mapped[str | None] = mapped_column(String(128), unique=True, index=True, default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     steps: Mapped[list[AgentWorkflowStep]] = relationship(back_populates="workflow", cascade="all, delete-orphan")
@@ -312,6 +314,7 @@ class AgentWorkflowStep(Base):
     position: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="pending")
     review_status: Mapped[str] = mapped_column(String(32), nullable=False, default="not_required")
+    reviewer_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), default=None)
     artifact_id: Mapped[int | None] = mapped_column(ForeignKey("ai_artifacts.id"), default=None)
     output_type: Mapped[str | None] = mapped_column(String(64), default=None)
     output_id: Mapped[int | None] = mapped_column(Integer, default=None)
@@ -321,6 +324,17 @@ class AgentWorkflowStep(Base):
     trace: Mapped[list | None] = mapped_column(JSON, default=list)
     detail: Mapped[dict | None] = mapped_column(JSON, default=None)
     workflow: Mapped[AgentWorkflowRun] = relationship(back_populates="steps")
+
+
+class AgentWorkflowReview(Base):
+    __tablename__ = "agent_workflow_reviews"
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    workflow_id: Mapped[int] = mapped_column(ForeignKey("agent_workflow_runs.id"), nullable=False, index=True)
+    step_id: Mapped[int] = mapped_column(ForeignKey("agent_workflow_steps.id"), nullable=False, index=True)
+    reviewer_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False)
+    note: Mapped[str | None] = mapped_column(Text, default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class TestRunItem(Base):

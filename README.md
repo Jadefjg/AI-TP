@@ -42,12 +42,31 @@ ai-tp/
 
 ```bash
 cd /Users/mark/Documents/0Study/ai-tp
-python3 -m venv .venv
+# macOS/Homebrew Python uses PEP 668; install into the project environment.
+# uv is recommended because it also bootstraps pip and keeps uv.lock in sync.
+uv sync --extra langgraph --extra dev
 source .venv/bin/activate
-pip install -e .
 cp .env.example .env
 uvicorn backend.main:app --reload --host 0.0.0.0 --port 8001
 ```
+
+如果没有安装 `uv`，也不要直接对系统 Python 执行 `pip install`：
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m ensurepip --upgrade
+python -m pip install -e ".[langgraph,dev]"
+```
+
+激活虚拟环境后，确认命令指向项目环境：
+
+```bash
+which python
+python -m pip --version
+```
+
+输出路径应包含项目目录下的 `.venv`。
 
 访问：
 
