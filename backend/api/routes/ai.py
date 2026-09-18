@@ -68,6 +68,7 @@ from backend.services.ai.constants import (
     MODULE_PERF_PLAN,
     MODULE_REQUIREMENT_REVIEW,
     MODULE_SECURITY_SCAN,
+    MODULE_AGENT_WORKFLOW,
 )
 from backend.services.ai.prompt_optimizer import (
     apply_suggestions_to_template,
@@ -126,12 +127,12 @@ def create_agent_workflow(body: dict | None = None, project: Project = Depends(g
     db.add(run); db.flush()
     run.steps = [AgentWorkflowStep(agent_key=k, step_name=m, position=i) for i, (k, m) in enumerate(SIX_AGENT_PIPELINE)]
     db.commit(); db.refresh(run)
-    first = run.steps[0]
     from backend.services.ai_job_queue import enqueue_ai_job
     try:
-        job = enqueue_ai_job(db, project=project, module_type=first.step_name, request_payload={**payload, "workflow_step_id": first.id})
-        first.ai_job_id = job.id
-        first.status = "running"
+        job = enqueue_ai_job(db, project=project, module_type=MODULE_AGENT_WORKFLOW,
+                             request_payload={**payload, "workflow_id": run.id, "thread_id": run.thread_id})
+        run.steps[0].ai_job_id = job.id
+        run.steps[0].status = "running"
         run.status = "running"
     except Exception:
         db.rollback()
@@ -185,6 +186,15 @@ def review_agent_workflow_step(workflow_id: int, step_id: int, body: AgentWorkfl
                    message=f"workflow #{workflow_id} step #{step_id} rejected",
                    detail={"workflow_id": workflow_id, "step_id": step_id, "note": body.note or ""}, project_id=project.id)
     if status == "approved":
+        if run.thread_id:
+            db.commit()
+            import asyncio
+            from backend.services.agents.langgraph_workflow import resume_agent_graph, project_graph_state
+            graph_state = asyncio.run(resume_agent_graph(thread_id=run.thread_id, approved=True,
+                                                         note=body.note or ""))
+            run = project_graph_state(db, workflow_id=workflow_id, state=graph_state)
+            db.commit(); db.refresh(run)
+            return _workflow_payload(run)
         from backend.services.ai_job_queue import enqueue_ai_job
         nxt = db.query(AgentWorkflowStep).filter(AgentWorkflowStep.workflow_id == workflow_id, AgentWorkflowStep.position > step.position).order_by(AgentWorkflowStep.position.asc()).first()
         if not nxt:
@@ -231,6 +241,17 @@ def resubmit_agent_workflow_step(workflow_id: int, step_id: int, body: AgentWork
     step.review_status, step.status = "not_required", "pending"
     step.detail = {**(step.detail or {}), "resubmission_note": body.note or ""}
     step.workflow.status = "running"
+    if step.workflow.thread_id:
+        thread_id = step.workflow.thread_id
+        step.attempt_count += 1
+        db.commit()
+        import asyncio
+        from backend.services.agents.langgraph_workflow import resume_agent_graph, project_graph_state
+        graph_state = asyncio.run(resume_agent_graph(thread_id=thread_id, approved=False,
+                                                     note=body.note or ""))
+        run = project_graph_state(db, workflow_id=workflow_id, state=graph_state)
+        db.commit(); db.refresh(run)
+        return _workflow_payload(run)
     from backend.services.ai_job_queue import enqueue_ai_job
     prior_handoff = (step.detail or {}).get("handoff") if isinstance(step.detail, dict) else None
     retry_input = (prior_handoff or {}).get("input") if isinstance(prior_handoff, dict) else None
@@ -253,8 +274,20 @@ def retry_agent_workflow_step(workflow_id: int, step_id: int, project: Project =
     existing = db.query(AiAsyncJob).filter_by(id=step.ai_job_id).one_or_none() if step.ai_job_id else None
     if existing and existing.status in {"pending", "running"}:
         raise HTTPException(409, "step already has an active job")
-    step.status, step.attempt_count = "pending", step.attempt_count + 1
     from backend.services.ai_job_queue import enqueue_ai_job
+    if step.workflow.thread_id:
+        from backend.services.ai.constants import MODULE_AGENT_WORKFLOW
+        step.status, step.workflow.status = "pending", "running"
+        step.attempt_count += 1
+        job = enqueue_ai_job(db, project=project, module_type=MODULE_AGENT_WORKFLOW,
+                             request_payload={**dict(step.workflow.input_payload or {}),
+                                              "workflow_id": workflow_id,
+                                              "thread_id": step.workflow.thread_id,
+                                              "retry_step_id": step.id})
+        step.ai_job_id = job.id
+        db.commit(); db.refresh(step)
+        return _workflow_payload(step.workflow)
+    step.status, step.attempt_count = "pending", step.attempt_count + 1
     prior_handoff = (step.detail or {}).get("handoff") if isinstance(step.detail, dict) else None
     payload = ((prior_handoff or {}).get("input") if isinstance(prior_handoff, dict) else None) or dict(step.workflow.input_payload or {})
     job = enqueue_ai_job(db, project=project, module_type=step.step_name, request_payload={**payload, "workflow_step_id": step.id})

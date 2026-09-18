@@ -23,6 +23,7 @@ from backend.services.ai.constants import (
     MODULE_PERF_PLAN,
     MODULE_REQUIREMENT_REVIEW,
     MODULE_SECURITY_SCAN,
+    MODULE_AGENT_WORKFLOW,
 )
 from backend.services.audit_service import log_action
 
@@ -178,6 +179,21 @@ async def _execute_ai_module(db: Session, job: AiAsyncJob, project: Project) -> 
 
     req = job.request_payload if isinstance(job.request_payload, dict) else {}
     module = job.module_type
+    if module == MODULE_AGENT_WORKFLOW:
+        from backend.services.agents.langgraph_workflow import invoke_full_agent_graph, retry_agent_graph, project_graph_state
+        workflow_id = int(req["workflow_id"])
+        if req.get("retry_step_id"):
+            from backend.models.entities import AgentWorkflowStep
+            failed_step = db.query(AgentWorkflowStep).filter_by(id=int(req["retry_step_id"])).one()
+            graph_state = await retry_agent_graph(thread_id=req["thread_id"], agent_key=failed_step.agent_key)
+        else:
+            graph_state = await invoke_full_agent_graph(payload=req, db=db, project=project,
+                                                         workflow_id=workflow_id,
+                                                         thread_id=req.get("thread_id"))
+        project_graph_state(db, workflow_id=workflow_id, state=graph_state)
+        snapshot = {k: v for k, v in graph_state.items() if k != "__interrupt__"}
+        return {"module_type": module, "payload": snapshot, "persisted_ids": [workflow_id],
+                "interrupted": bool(graph_state.get("__interrupt__"))}
     # LangGraph adapter is the canonical execution path for the six workflow
     # agents; requirement review keeps its persistence-specific wrapper below.
     if module in {MODULE_API_AUTOMATION, MODULE_PERF_PLAN, MODULE_SECURITY_SCAN}:

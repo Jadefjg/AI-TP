@@ -22,6 +22,9 @@ class ApiInput(BaseModel):
     case_info: str = Field(min_length=1)
     api_info: str = Field(min_length=1)
 
+class UiInput(BaseModel):
+    case_id: int
+
 class PerfInput(BaseModel):
     biz_desc: str = Field(min_length=1)
     api_doc: str = ""
@@ -65,6 +68,13 @@ def build_step_input(module: str, *, run_input: dict[str, Any], result: dict[str
         reviewed = _requirement_review_text(value, base.get("requirement_text") or "")
         return CasesInput(requirement_text=reviewed,
                           openapi_content=base.get("openapi_content")).model_dump(exclude_none=True)
+    if module == "ui_automation":
+        ids = result.get("persisted_ids") or []
+        payload_case_id = value.get("case_id") if isinstance(value, dict) else None
+        case_id = base.get("case_id") or payload_case_id or (ids[0] if ids else None)
+        if not case_id:
+            raise ValueError("functional-case handoff does not contain case_id")
+        return UiInput(case_id=int(case_id)).model_dump()
     if module == "api_automation":
         return ApiInput(case_info=base.get("case_info") or text,
                         api_info=base.get("api_info") or text).model_dump()

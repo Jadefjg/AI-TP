@@ -6,6 +6,7 @@ MODULE_OPENAPI_SPEC = "openapi_spec"
 MODULE_API_AUTOMATION = "api_automation"
 MODULE_PERF_PLAN = "perf_plan"
 MODULE_SECURITY_SCAN = "security_scan"
+MODULE_AGENT_WORKFLOW = "agent_workflow"
 
 AI_MODULES: tuple[str, ...] = (
     MODULE_REQUIREMENT_REVIEW,
@@ -14,6 +15,7 @@ AI_MODULES: tuple[str, ...] = (
     MODULE_API_AUTOMATION,
     MODULE_PERF_PLAN,
     MODULE_SECURITY_SCAN,
+    MODULE_AGENT_WORKFLOW,
 )
 
 MODEL_PROFILE_HIGH = "high_precision"

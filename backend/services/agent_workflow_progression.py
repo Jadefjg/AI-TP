@@ -13,6 +13,11 @@ def progress_after_step(db: Session, *, project: Project, step_id: int, result: 
     if not step:
         return None
     run = db.query(AgentWorkflowRun).filter_by(id=step.workflow_id, project_id=project.id).with_for_update().one()
+    # New workflows are driven exclusively by LangGraph. This legacy projector
+    # remains only for pre-migration runs and must never enqueue a parallel
+    # branch for a checkpoint-backed workflow.
+    if run.thread_id:
+        return run
     if step.status == "completed" and step.detail and step.detail.get("result") == result:
         return run
     # A late/duplicate worker callback must not reopen a terminal workflow.
